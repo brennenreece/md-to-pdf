@@ -473,7 +473,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Weight dropdown for a text role. Bundled families list only the weights they include. System
+	 * Weight picker for a text role. Bundled families with several weights get a radio group; others get a dropdown. System
 	 * fonts list the common weights. Lists the weight the font's own family provides.
 	 */
 	private weightSetting(el: HTMLElement, name: string, fontKey: TextKey, overrideKey: BoolKey | null, weightKey: WeightKey) {
@@ -487,6 +487,24 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 
 		const current = this.plugin.settings[weightKey];
 		if (!options.some(([w]) => w === current)) options.push([current, `Weight ${current}`]);
+
+		if (family && options.length > 1) {
+			const setting = new Setting(el).setName(name);
+			const group = setting.controlEl.createDiv({ cls: "md2pdf-radio-group" });
+			const groupName = `md2pdf-${weightKey}-${fontKey}`;
+			for (const [w, label] of options) {
+				const item = group.createEl("label", { cls: "md2pdf-radio-option" });
+				const input = item.createEl("input", { attr: { type: "radio", name: groupName } });
+				input.checked = w === current;
+				item.createSpan({ text: label });
+				input.addEventListener("change", async () => {
+					if (!input.checked) return;
+					this.plugin.settings[weightKey] = w;
+					await this.plugin.saveSettings();
+				});
+			}
+			return;
+		}
 
 		new Setting(el).setName(name).addDropdown((d) => {
 			for (const [w, label] of options) d.addOption(String(w), label);
