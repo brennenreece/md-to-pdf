@@ -14,17 +14,23 @@ Goal: export Obsidian notes to PDFs that match the reading preview exactly, incl
 - Page setup: size, orientation, margins.
 - Body text: font, size, line height, paragraph spacing.
 - Global heading font, with per-level override switches (H1, H2, H3), and heading sizes and spacing.
+- Heading and body weight per level, with no forced bold. Bundled families choose weight and italic with radio buttons in their previews.
+- Font previews render each face at the chosen point size, labeled (regular, bold, italic, and so on). Bundled fonts load into the settings page.
+- League Gothic and League Gothic Condensed are bundled (SIL OFL 1.1).
+- Settings page keeps its scroll position when a setting changes.
+- Theme preview tab: a Lorem Ipsum sample (H1–H6, text, lists, quote, code, table) that uses the export CSS and current settings.
 - "Start each H1 on a new page" toggle on the H1 size row.
 - `---` horizontal rules start a new page (on by default, can be turned off).
 - Header text and page number format, with `{{title}}`, `{{page}}`, `{{pages}}` tokens.
 - Code font and size.
-- Bundled font collections: TeX Gyre (8 families) and League of Moveable Type (all families). One grouped font dropdown for all fonts, with a preview line.
+- Bundled font collections: TeX Gyre (8 families) and League of Moveable Type (all families, including League Gothic). One grouped font dropdown for all fonts.
 - Themes: save, load, and delete named style presets, and reset to defaults. Stored in plugin data.
 
 ### Needs verification in Obsidian
 - `---` page breaks, and the global heading font with per-level overrides (built, not yet exported in the app).
 - Bundled fonts in the export: TeX Gyre and League families render in the PDF, and the preview line in settings updates.
-- Themes: save, load, delete, and reset.
+- Themes: save, load, delete, and reset, including heading weights and italics.
+- Export with per-level heading weights, and the theme preview tab's sample against the PDF output.
 
 ## Next
 
@@ -69,4 +75,6 @@ Goal: export Obsidian notes to PDFs that match the reading preview exactly, incl
 - Full app CSS hides content when printed, so only a filtered set of rules is copied. New Obsidian theme rules may need to be added to the filter.
 - Printing waits a fixed 500 ms after load. A load-complete signal would be more reliable.
 - Settings for page size and margins are not yet previewed live.
+- The H1 sample in the theme preview is shown at its real point size, which may be large inside the settings panel.
+- Settings page scroll preservation depends on Obsidian's settings container class. Confirm it in Obsidian.
 - Mobile support depends on how Obsidian mobile exposes printing.

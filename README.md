@@ -6,7 +6,7 @@ The export renders the note with Obsidian's own markdown renderer, so custom cod
 
 ## Status
 
-Early development. Export works for body content, page setup, typography, headers, and page numbers. BRNotation staff notation is still being refined.
+Early development. Export works for body content, page setup, typography, headers, and page numbers. BRNotation staff notation is still being refined. See [ROADMAP.md](ROADMAP.md) for planned work.
 
 ### Fonts
 
@@ -15,11 +15,19 @@ The font dropdown lists the system stacks, then two bundled collections:
 - **TeX Gyre**: Adventor, Bonum, Cursor, Heros, Heros Condensed, Pagella, Schola, Termes. Licensed under the GUST Font License (`assets/fonts/tg/LICENSE-GFL.txt`).
 - **League of Moveable Type**: all families in the collection, licensed under the SIL Open Font License 1.1 (`assets/fonts/league/LICENSE-OFL.txt`). See `assets/fonts/league/NOTICE.md` for copyright notices.
 
+- **League Gothic** and **League Gothic Condensed**: included under the same license.
+
 TeX Gyre Chorus is not bundled because the archive only includes its medium italic face.
+
+Choose a font from the grouped dropdown. Headings and body text each have their own weight and italic settings. For bundled families, pick the variation with the radio button beside its preview. Previews are drawn at the chosen point size.
 
 ### Themes
 
-Use **Save current style as theme** to store the page, margin, font, heading, code, and header/footer settings under a name. Load, delete, or reset from the Themes section. Themes are stored in the plugin's data file.
+Use **Save current style as theme** to store the page, margin, font, heading weight and italic, code, and header/footer settings under a name. Load, delete, or reset from the Themes section. Themes are stored in the plugin's data file.
+
+### Theme preview
+
+The settings page has a **Theme preview** tab. It shows Lorem Ipsum sample text for every heading level and common text styles. It uses the same CSS as export, so it updates as you change settings.
 
 ## Development
 
