@@ -35,7 +35,9 @@ export function contentCss(s: MdToPdfSettings): string {
 .md2pdf-root table,
 .md2pdf-root pre {
 	margin: 0 0 ${s.paragraphSpacingEm}em 0 !important;
+	text-indent: 0 !important;
 }
+.md2pdf-root * { text-indent: 0 !important; }
 .md2pdf-root h1,
 .md2pdf-root h2,
 .md2pdf-root h3,
