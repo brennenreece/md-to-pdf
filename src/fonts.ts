@@ -208,22 +208,51 @@ export function fontKeysInUse(s: {
 	return keys;
 }
 
-const previewLoaded = new Set<string>();
+const previewLoaded = new Map<string, Promise<void>>();
+
+/** Human-readable label for a face, used under the font preview: "Regular", "Bold Italic", "Light". */
+export function faceLabel(face: BundledFace): string {
+	const names: Record<number, string> = {
+		100: "Thin",
+		200: "ExtraLight",
+		300: "Light",
+		400: "Regular",
+		500: "Medium",
+		600: "SemiBold",
+		700: "Bold",
+		800: "ExtraBold",
+		900: "Black",
+	};
+	const weight = names[face.weight] ?? `Weight ${face.weight}`;
+	if (face.weight === 400 && face.italic) return "Italic";
+	if (face.italic) return `${weight} Italic`;
+	return weight;
+}
 
 /**
- * Registers one face of a bundled family with the settings window so the font dropdown can
- * preview it. Only the regular face is needed for a preview line.
+ * Registers every face of a bundled family with the document so the settings preview can show
+ * each style. Faces are registered under the same CSS name the export uses, so a preview matches
+ * the printed output. Results are cached per family; a failed load is retried on the next call.
  */
-export async function loadPreviewFont(
+export function loadPreviewFont(
 	adapter: { readBinary(path: string): Promise<ArrayBuffer> },
 	pluginDir: string,
 	family: BundledFamily,
 ): Promise<void> {
-	if (previewLoaded.has(family.id)) return;
-	const face = family.faces.find((f) => f.weight === 400 && !f.italic) ?? family.faces[0];
-	const buf = await adapter.readBinary(`${pluginDir}/${FONT_DIR}/${family.collection}/${face.file}`);
-	const font = new FontFace(`md2pdf-${family.id}`, buf, { weight: String(face.weight) });
-	await font.load();
-	(document.fonts as unknown as { add(f: globalThis.FontFace): void }).add(font);
-	previewLoaded.add(family.id);
+	const cached = previewLoaded.get(family.id);
+	if (cached) return cached;
+	const pending = Promise.all(
+		family.faces.map(async (face) => {
+			const buf = await adapter.readBinary(`${pluginDir}/${FONT_DIR}/${family.collection}/${face.file}`);
+			const font = new FontFace(`md2pdf-${family.id}`, buf, {
+				weight: String(face.weight),
+				style: face.italic ? "italic" : "normal",
+			});
+			await font.load();
+			(document.fonts as unknown as { add(f: globalThis.FontFace): void }).add(font);
+		}),
+	).then(() => undefined);
+	previewLoaded.set(family.id, pending);
+	pending.catch(() => previewLoaded.delete(family.id));
+	return pending;
 }

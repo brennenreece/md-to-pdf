@@ -55,6 +55,8 @@ html, body {
 }
 .md2pdf-root {
 	font-family: ${resolveFontCss(s.bodyFont)} !important;
+	font-weight: ${s.bodyWeight};
+	font-style: ${s.bodyItalic ? "italic" : "normal"};
 	font-size: ${s.bodySizePt}pt !important;
 	line-height: ${s.bodyLineHeight} !important;
 	color: #111 !important;
@@ -79,15 +81,14 @@ html, body {
 .md2pdf-root h5,
 .md2pdf-root h6 {
 	color: #000 !important;
-	font-weight: 600 !important;
 	margin-top: ${s.headingSpaceBeforeEm}em !important;
 	margin-bottom: ${s.headingSpaceAfterEm}em !important;
 	break-after: avoid !important;
 	page-break-after: avoid !important;
 }
-.md2pdf-root h1 { font-family: ${s.h1OverrideFont ? resolveFontCss(s.h1Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h1SizePt}pt !important; }
-.md2pdf-root h2 { font-family: ${s.h2OverrideFont ? resolveFontCss(s.h2Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h2SizePt}pt !important; }
-.md2pdf-root h3 { font-family: ${s.h3OverrideFont ? resolveFontCss(s.h3Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h3SizePt}pt !important; }
+.md2pdf-root h1 { font-family: ${s.h1OverrideFont ? resolveFontCss(s.h1Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h1SizePt}pt !important; font-weight: ${s.h1Weight} !important; font-style: ${s.h1Italic ? "italic" : "normal"} !important; }
+.md2pdf-root h2 { font-family: ${s.h2OverrideFont ? resolveFontCss(s.h2Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h2SizePt}pt !important; font-weight: ${s.h2Weight} !important; font-style: ${s.h2Italic ? "italic" : "normal"} !important; }
+.md2pdf-root h3 { font-family: ${s.h3OverrideFont ? resolveFontCss(s.h3Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h3SizePt}pt !important; font-weight: ${s.h3Weight} !important; font-style: ${s.h3Italic ? "italic" : "normal"} !important; }
 .md2pdf-root h1:first-child { margin-top: 0 !important; }
 ${
 	s.pageBreakBeforeH1
