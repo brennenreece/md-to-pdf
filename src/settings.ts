@@ -204,7 +204,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.marginSetting(containerEl, "Left", "marginLeftMm");
 
 		new Setting(containerEl).setName("Body text").setHeading();
-		this.fontSetting(containerEl, "Body font", "bodyFont");
+		this.fontSetting(containerEl, "Body font", "bodyFont", s.bodySizePt);
 		this.weightSetting(containerEl, "Body weight", "bodyFont", null, "bodyWeight");
 		new Setting(containerEl).setName("Body italic").addToggle((t) =>
 			t.setValue(s.bodyItalic).onChange(async (v) => {
@@ -217,7 +217,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.numberSetting(containerEl, "Paragraph spacing (em)", "paragraphSpacingEm");
 
 		new Setting(containerEl).setName("Headings").setHeading();
-		this.fontSetting(containerEl, "Heading font (all levels)", "headingFont");
+		this.fontSetting(containerEl, "Heading font (all levels)", "headingFont", s.h1SizePt);
 		this.numberSetting(containerEl, "Space before headings (em)", "headingSpaceBeforeEm");
 		this.numberSetting(containerEl, "Space after headings (em)", "headingSpaceAfterEm");
 		this.headingLevel(containerEl, "H1", "h1Font", "h1SizePt", "h1OverrideFont", "h1Weight", "h1Italic", true);
@@ -233,7 +233,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		);
 
 		new Setting(containerEl).setName("Code").setHeading();
-		this.fontSetting(containerEl, "Code font", "codeFont");
+		this.fontSetting(containerEl, "Code font", "codeFont", s.codeSizePt);
 		this.numberSetting(containerEl, "Code size (pt)", "codeSizePt");
 
 		new Setting(containerEl).setName("Header and footer").setHeading();
@@ -336,7 +336,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 	 * The preview lists every face of the chosen family with its label. Weight and italic are
 	 * Weight and italic have their own rows.
 	 */
-	private fontSetting(el: HTMLElement, name: string, key: TextKey) {
+	private fontSetting(el: HTMLElement, name: string, key: TextKey, sizePt: number) {
 		new Setting(el).setName(name).addDropdown((d) => {
 			const current = this.plugin.settings[key];
 			const select = d.selectEl;
@@ -368,19 +368,19 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			});
 		});
 
-		this.fontPreview(el, this.plugin.settings[key]);
+		this.fontPreview(el, this.plugin.settings[key], sizePt);
 	}
 
 	/**
 	 * Labeled preview lines for the chosen font. Bundled families show each face (Regular, Italic,
 	 * Bold, Bold Italic, and any other weights). System stacks show a single regular line.
 	 */
-	private fontPreview(el: HTMLElement, value: string) {
+	private fontPreview(el: HTMLElement, value: string, sizePt: number) {
 		const box = el.createDiv({ cls: "md2pdf-font-preview" });
 		const family = findBundledFamily(value);
 
 		if (!family) {
-			this.previewLine(box, "Regular", resolveFontCss(value), "normal", 400);
+			this.previewLine(box, "Regular", resolveFontCss(value), "normal", 400, sizePt);
 			return;
 		}
 
@@ -389,7 +389,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			.then(() => {
 				status.remove();
 				for (const face of family.faces) {
-					this.previewLine(box, faceLabel(face), resolveFontCss(value), face.italic ? "italic" : "normal", face.weight);
+					this.previewLine(box, faceLabel(face), resolveFontCss(value), face.italic ? "italic" : "normal", face.weight, sizePt);
 				}
 			})
 			.catch((err) => {
@@ -398,13 +398,14 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			});
 	}
 
-	private previewLine(box: HTMLElement, label: string, family: string, style: string, weight: number) {
+	private previewLine(box: HTMLElement, label: string, family: string, style: string, weight: number, sizePt: number) {
 		const row = box.createDiv({ cls: "md2pdf-font-preview-row" });
 		row.createSpan({ cls: "md2pdf-font-preview-label", text: label });
 		const sample = row.createSpan({ cls: "md2pdf-font-preview-sample", text: "The quick brown fox jumps over the lazy dog." });
 		sample.style.fontFamily = family;
 		sample.style.fontStyle = style;
 		sample.style.fontWeight = String(weight);
+		sample.style.fontSize = `${sizePt}pt`;
 	}
 
 	/**
@@ -429,7 +430,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			}),
 		);
 		if (this.plugin.settings[overrideKey]) {
-			this.fontSetting(el, `${level} font`, fontKey);
+			this.fontSetting(el, `${level} font`, fontKey, this.plugin.settings[sizeKey]);
 		}
 		this.weightSetting(el, `${level} weight`, fontKey, overrideKey, weightKey);
 		new Setting(el).setName(`${level} italic`).addToggle((t) =>
