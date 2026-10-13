@@ -154,6 +154,11 @@ type MarginKey = "marginTopMm" | "marginRightMm" | "marginBottomMm" | "marginLef
 
 type WeightKey = "h1Weight" | "h2Weight" | "h3Weight" | "bodyWeight";
 type ItalicKey = "h1Italic" | "h2Italic" | "h3Italic" | "bodyItalic";
+/** The weight and italic settings that a role's preview radio buttons write to. */
+interface FaceKeys {
+	weight: WeightKey;
+	italic: ItalicKey;
+}
 
 /** Weights offered for system fonts, which have no weight list of their own. */
 const SYSTEM_WEIGHTS: Array<[number, string]> = [
@@ -215,14 +220,8 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.marginSetting(containerEl, "Left", "marginLeftMm");
 
 		new Setting(containerEl).setName("Body text").setHeading();
-		this.fontSetting(containerEl, "Body font", "bodyFont", s.bodySizePt, "bodyWeight");
-		this.weightSetting(containerEl, "Body weight", "bodyFont", null, "bodyWeight");
-		new Setting(containerEl).setName("Body italic").addToggle((t) =>
-			t.setValue(s.bodyItalic).onChange(async (v) => {
-				s.bodyItalic = v;
-				await save();
-			}),
-		);
+		this.fontSetting(containerEl, "Body font", "bodyFont", s.bodySizePt, { weight: "bodyWeight", italic: "bodyItalic" });
+		this.weightSetting(containerEl, "Body weight", "bodyFont", null, "bodyWeight", "bodyItalic");
 		this.numberSetting(containerEl, "Font size (pt)", "bodySizePt");
 		this.numberSetting(containerEl, "Line height", "bodyLineHeight");
 		this.numberSetting(containerEl, "Paragraph spacing (em)", "paragraphSpacingEm");
@@ -231,9 +230,9 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.fontSetting(containerEl, "Heading font (all levels)", "headingFont", s.h1SizePt);
 		this.numberSetting(containerEl, "Space before headings (em)", "headingSpaceBeforeEm");
 		this.numberSetting(containerEl, "Space after headings (em)", "headingSpaceAfterEm");
-		this.headingLevel(containerEl, "H1", "h1Font", "h1SizePt", "h1OverrideFont", "h1Weight", "h1Italic", true);
-		this.headingLevel(containerEl, "H2", "h2Font", "h2SizePt", "h2OverrideFont", "h2Weight", "h2Italic");
-		this.headingLevel(containerEl, "H3", "h3Font", "h3SizePt", "h3OverrideFont", "h3Weight", "h3Italic");
+		this.headingLevel(containerEl, "H1", "h1Font", "h1SizePt", "h1OverrideFont", { weight: "h1Weight", italic: "h1Italic" }, true);
+		this.headingLevel(containerEl, "H2", "h2Font", "h2SizePt", "h2OverrideFont", { weight: "h2Weight", italic: "h2Italic" });
+		this.headingLevel(containerEl, "H3", "h3Font", "h3SizePt", "h3OverrideFont", { weight: "h3Weight", italic: "h3Italic" });
 
 		new Setting(containerEl).setName("Page breaks").setHeading();
 		new Setting(containerEl).setName("Page break at horizontal rule (---)").addToggle((t) =>
@@ -344,10 +343,10 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 
 	/**
 	 * Font picker for one text role. One dropdown lists system stacks and bundled families.
-	 * The preview lists every face of the chosen family with its label. Weight and italic are
-	 * Weight and italic have their own rows.
+	 * The preview lists every face of the chosen family with its label. Each face has a radio button
+	 * that sets the weight and italic for that role.
 	 */
-	private fontSetting(el: HTMLElement, name: string, key: TextKey, sizePt: number, weightKey?: WeightKey) {
+	private fontSetting(el: HTMLElement, name: string, key: TextKey, sizePt: number, faceKeys?: FaceKeys) {
 		new Setting(el).setName(name).addDropdown((d) => {
 			const current = this.plugin.settings[key];
 			const select = d.selectEl;
@@ -379,7 +378,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			});
 		});
 
-		this.fontPreview(el, this.plugin.settings[key], sizePt, weightKey);
+		this.fontPreview(el, this.plugin.settings[key], sizePt, faceKeys);
 	}
 
 	/**
@@ -387,7 +386,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 	 * face. When a weight key is given, each upright face gets a radio button that selects that weight.
 	 * System stacks show a single regular line.
 	 */
-	private fontPreview(el: HTMLElement, value: string, sizePt: number, weightKey?: WeightKey) {
+	private fontPreview(el: HTMLElement, value: string, sizePt: number, faceKeys?: FaceKeys) {
 		const box = el.createDiv({ cls: "md2pdf-font-preview" });
 		const family = findBundledFamily(value);
 
@@ -401,7 +400,9 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			.then(() => {
 				status.remove();
 				for (const face of family.faces) {
-					const radio = weightKey && !face.italic ? { name: `md2pdf-${weightKey}`, weight: face.weight, key: weightKey } : undefined;
+					const radio = faceKeys
+						? { name: `md2pdf-${faceKeys.weight}`, weight: face.weight, italic: face.italic, keys: faceKeys }
+						: undefined;
 					this.previewLine(
 						box,
 						faceLabel(face),
@@ -426,15 +427,17 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		style: string,
 		weight: number,
 		sizePt: number,
-		radio?: { name: string; weight: number; key: WeightKey },
+		radio?: { name: string; weight: number; italic: boolean; keys: FaceKeys },
 	) {
 		const row = box.createDiv({ cls: "md2pdf-font-preview-row" });
 		if (radio) {
+			const { weight: wKey, italic: iKey } = radio.keys;
 			const input = row.createEl("input", { attr: { type: "radio", name: radio.name } });
-			input.checked = this.plugin.settings[radio.key] === radio.weight;
+			input.checked = this.plugin.settings[wKey] === radio.weight && this.plugin.settings[iKey] === radio.italic;
 			input.addEventListener("change", async () => {
 				if (!input.checked) return;
-				this.plugin.settings[radio.key] = radio.weight;
+				this.plugin.settings[wKey] = radio.weight;
+				this.plugin.settings[iKey] = radio.italic;
 				await this.plugin.saveSettings();
 			});
 		}
@@ -456,8 +459,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		fontKey: TextKey,
 		sizeKey: NumberKey,
 		overrideKey: BoolKey,
-		weightKey: WeightKey,
-		italicKey: ItalicKey,
+		faceKeys: FaceKeys,
 		withPageBreak = false,
 	) {
 		new Setting(el).setName(`${level}`).setDesc("Uses its own font instead of the heading font.").addToggle((t) =>
@@ -468,17 +470,11 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			}),
 		);
 		if (this.plugin.settings[overrideKey]) {
-			this.fontSetting(el, `${level} font`, fontKey, this.plugin.settings[sizeKey], weightKey);
+			this.fontSetting(el, `${level} font`, fontKey, this.plugin.settings[sizeKey], faceKeys);
 		} else {
-			this.fontPreview(el, this.plugin.settings.headingFont, this.plugin.settings[sizeKey], weightKey);
+			this.fontPreview(el, this.plugin.settings.headingFont, this.plugin.settings[sizeKey], faceKeys);
 		}
-		this.weightSetting(el, `${level} weight`, fontKey, overrideKey, weightKey);
-		new Setting(el).setName(`${level} italic`).addToggle((t) =>
-			t.setValue(this.plugin.settings[italicKey]).onChange(async (v) => {
-				this.plugin.settings[italicKey] = v;
-				await this.plugin.saveSettings();
-			}),
-		);
+		this.weightSetting(el, `${level} weight`, fontKey, overrideKey, faceKeys.weight, faceKeys.italic);
 		const row = new Setting(el).setName(`${level} size (pt)`).addText((t) =>
 			t.setValue(String(this.plugin.settings[sizeKey])).onChange(async (v) => {
 				const n = parseFloat(v);
@@ -505,7 +501,14 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 	 * Weight dropdown for a text role. Bundled families choose their weight with radio buttons in the
 	 * font preview instead, so this only handles system fonts.
 	 */
-	private weightSetting(el: HTMLElement, name: string, fontKey: TextKey, overrideKey: BoolKey | null, weightKey: WeightKey) {
+	private weightSetting(
+		el: HTMLElement,
+		name: string,
+		fontKey: TextKey,
+		overrideKey: BoolKey | null,
+		weightKey: WeightKey,
+		italicKey: ItalicKey,
+	) {
 		const fontValue = overrideKey && !this.plugin.settings[overrideKey] ? this.plugin.settings.headingFont : this.plugin.settings[fontKey];
 		if (findBundledFamily(fontValue)) return;
 
@@ -520,6 +523,12 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings();
 			});
 		});
+		new Setting(el).setName(name.replace(/ weight$/, "") + " italic").addToggle((t) =>
+			t.setValue(this.plugin.settings[italicKey]).onChange(async (v) => {
+				this.plugin.settings[italicKey] = v;
+				await this.plugin.saveSettings();
+			}),
+		);
 	}
 
 	private textSetting(el: HTMLElement, name: string, key: TextKey) {
