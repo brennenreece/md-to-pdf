@@ -68,6 +68,14 @@ export const BUNDLED_FAMILIES: BundledFamily[] = [
 		["Fanwood Text Italic.otf", 400, true],
 	]),
 	leagueFamily("goudy-bookletter", "Goudy Bookletter 1911", [["GoudyBookletter1911.otf", 400]]),
+	leagueFamily("gothic", "League Gothic", [
+		["LeagueGothic-Regular.otf", 400],
+		["LeagueGothic-Italic.otf", 400, true],
+	]),
+	leagueFamily("gothic-condensed", "League Gothic Condensed", [
+		["LeagueGothic-Condensed.otf", 400],
+		["LeagueGothic-CondensedItalic.otf", 400, true],
+	]),
 	leagueFamily("junction", "Junction", [
 		["Junction-light.otf", 300],
 		["Junction-regular.otf", 500],
