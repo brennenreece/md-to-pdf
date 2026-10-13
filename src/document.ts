@@ -13,47 +13,9 @@ export function pageSizeCss(s: MdToPdfSettings): string {
 	return s.orientation === "landscape" ? `${h}mm ${w}mm` : `${w}mm ${h}mm`;
 }
 
-/** Builds the full print document: the app's CSS first, then print overrides. */
-export function buildDocumentHtml(opts: {
-	title: string;
-	bodyHtml: string;
-	appCss: string;
-	fontFaceCss: string;
-	settings: MdToPdfSettings;
-}): string {
-	const s = opts.settings;
-	const reset = `
-html, body {
-	margin: 0 !important;
-	padding: 0 !important;
-	background: white !important;
-	color: black !important;
-}
-body * {
-	visibility: visible !important;
-	opacity: 1 !important;
-}
-@media print {
-	body * {
-		visibility: visible !important;
-		opacity: 1 !important;
-	}
-}
-`;
-	const css = `
-@page {
-	size: ${pageSizeCss(s)};
-	margin: ${s.marginTopMm}mm ${s.marginRightMm}mm ${s.marginBottomMm}mm ${s.marginLeftMm}mm;
-}
-html, body {
-	background: #fff !important;
-	color: #111 !important;
-	height: auto !important;
-	overflow: visible !important;
-	margin: 0 !important;
-	padding: 0 !important;
-}
-.md2pdf-root {
+/** Styles for the print content (the .md2pdf-root tree). Shared with the settings preview. */
+export function contentCss(s: MdToPdfSettings): string {
+	return `.md2pdf-root {
 	font-family: ${resolveFontCss(s.bodyFont)} !important;
 	font-weight: ${s.bodyWeight};
 	font-style: ${s.bodyItalic ? "italic" : "normal"};
@@ -131,6 +93,49 @@ ${
 		: ".md2pdf-root hr { display: none !important; }"
 }
 `;
+}
+
+/** Builds the full print document: the app's CSS first, then print overrides. */
+export function buildDocumentHtml(opts: {
+	title: string;
+	bodyHtml: string;
+	appCss: string;
+	fontFaceCss: string;
+	settings: MdToPdfSettings;
+}): string {
+	const s = opts.settings;
+	const reset = `
+html, body {
+	margin: 0 !important;
+	padding: 0 !important;
+	background: white !important;
+	color: black !important;
+}
+body * {
+	visibility: visible !important;
+	opacity: 1 !important;
+}
+@media print {
+	body * {
+		visibility: visible !important;
+		opacity: 1 !important;
+	}
+}
+`;
+	const css = `
+@page {
+	size: ${pageSizeCss(s)};
+	margin: ${s.marginTopMm}mm ${s.marginRightMm}mm ${s.marginBottomMm}mm ${s.marginLeftMm}mm;
+}
+html, body {
+	background: #fff !important;
+	color: #111 !important;
+	height: auto !important;
+	overflow: visible !important;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+${contentCss(s)}`;
 
 const hideUiElements = `
 /* Ensure nothing is hidden in the print context. SVG hit-test rects (opacity="0") stay transparent. */

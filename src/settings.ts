@@ -6,9 +6,11 @@ import {
 	bundledFontKey,
 	faceLabel,
 	findBundledFamily,
+	fontKeysInUse,
 	loadPreviewFont,
 	resolveFontCss,
 } from "./fonts";
+import { contentCss } from "./document";
 import { applyTheme, snapshotTheme } from "./themes";
 
 export type PageSize = "A4" | "A5" | "Letter" | "Legal";
@@ -170,12 +172,87 @@ const SYSTEM_WEIGHTS: Array<[number, string]> = [
 	[800, "Extra bold"],
 ];
 
+/** Sample page for the theme preview. Covers every heading level and the common text styles. */
+const THEME_PREVIEW_HTML = `
+<h1>Lorem Ipsum Dolor</h1>
+<p>Lorem ipsum dolor sit amet, <strong>consectetur adipiscing</strong> elit, sed do <em>eiusmod tempor</em> incididunt ut labore et dolore magna aliqua. <a href="#">Ut enim ad minim</a> veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+<h2>Duis Aute Irure</h2>
+<p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+<h3>Sed Ut Perspiciatis</h3>
+<p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis.</p>
+<h4>Nemo Enim Ipsam</h4>
+<p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.</p>
+<h5>Neque Porro Quisquam</h5>
+<p>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet.</p>
+<h6>Quis Autem Vel Eum</h6>
+<p>Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae.</p>
+<p><em>Italic text</em>, <strong>bold text</strong>, and <code>inline code</code> sit beside each other.</p>
+<ul>
+<li>Lorem ipsum dolor sit amet</li>
+<li>Consectetur adipiscing elit</li>
+<li>Sed do eiusmod tempor</li>
+</ul>
+<ol>
+<li>Ut enim ad minim veniam</li>
+<li>Quis nostrud exercitation</li>
+</ol>
+<blockquote><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque lacinia mauris at nulla.</p></blockquote>
+<pre><code>const lorem = "ipsum dolor sit amet";
+console.log(lorem);</code></pre>
+<table>
+<thead><tr><th>Lorem</th><th>Ipsum</th><th>Dolor</th></tr></thead>
+<tbody>
+<tr><td>Sit amet</td><td>Consectetur</td><td>Adipiscing</td></tr>
+<tr><td>Sed do</td><td>Eiusmod</td><td>Tempor</td></tr>
+</tbody>
+</table>
+<hr>
+<p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+`;
+
 export class MdToPdfSettingTab extends PluginSettingTab {
 	plugin: MdToPdfPlugin;
+	private tab: "settings" | "preview" = "settings";
 
 	constructor(app: App, plugin: MdToPdfPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	private renderTabs(el: HTMLElement) {
+		const bar = el.createDiv({ cls: "md2pdf-tabs" });
+		const tabs: Array<["settings" | "preview", string]> = [
+			["settings", "Settings"],
+			["preview", "Theme preview"],
+		];
+		for (const [id, label] of tabs) {
+			const btn = bar.createEl("button", { text: label, cls: this.tab === id ? "mod-cta" : undefined });
+			btn.addEventListener("click", () => {
+				if (this.tab === id) return;
+				this.tab = id;
+				this.display();
+			});
+		}
+	}
+
+	/** Sample page rendered with the same print CSS as export, so it shows what the PDF will look like. */
+	private renderThemePreview(el: HTMLElement) {
+		const s = this.plugin.settings;
+		const wrap = el.createDiv({ cls: "md2pdf-theme-preview" });
+		const status = wrap.createDiv({ cls: "md2pdf-font-preview-status", text: "Loading fonts…" });
+		wrap.createEl("style", { text: contentCss(s) });
+		const page = wrap.createDiv({ cls: "md2pdf-root markdown-rendered" });
+		page.innerHTML = THEME_PREVIEW_HTML;
+
+		const families = fontKeysInUse(s)
+			.map((key) => findBundledFamily(key))
+			.filter((f): f is NonNullable<typeof f> => f !== undefined);
+		Promise.all(families.map((f) => loadPreviewFont(this.app.vault.adapter, this.plugin.manifest.dir ?? "", f)))
+			.then(() => status.remove())
+			.catch((err) => {
+				console.error("[md-to-pdf] theme preview fonts failed", err);
+				status.setText("Some fonts could not be loaded for this preview.");
+			});
 	}
 
 	/** Re-renders the page while keeping the scroll position, so changing a control doesn't jump to the top. */
@@ -192,6 +269,11 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+		this.renderTabs(containerEl);
+		if (this.tab === "preview") {
+			this.renderThemePreview(containerEl);
+			return;
+		}
 		const s = this.plugin.settings;
 		const save = () => this.plugin.saveSettings();
 
