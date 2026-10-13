@@ -1,4 +1,5 @@
 import type { Alignment, MdToPdfSettings } from "./settings";
+import { resolveFontCss } from "./fonts";
 
 const PAGE_MM: Record<string, [number, number]> = {
 	A4: [210, 297],
@@ -17,6 +18,7 @@ export function buildDocumentHtml(opts: {
 	title: string;
 	bodyHtml: string;
 	appCss: string;
+	fontFaceCss: string;
 	settings: MdToPdfSettings;
 }): string {
 	const s = opts.settings;
@@ -52,7 +54,7 @@ html, body {
 	padding: 0 !important;
 }
 .md2pdf-root {
-	font-family: ${s.bodyFont} !important;
+	font-family: ${resolveFontCss(s.bodyFont)} !important;
 	font-size: ${s.bodySizePt}pt !important;
 	line-height: ${s.bodyLineHeight} !important;
 	color: #111 !important;
@@ -83,9 +85,9 @@ html, body {
 	break-after: avoid !important;
 	page-break-after: avoid !important;
 }
-.md2pdf-root h1 { font-family: ${s.h1OverrideFont ? s.h1Font : s.headingFont} !important; font-size: ${s.h1SizePt}pt !important; }
-.md2pdf-root h2 { font-family: ${s.h2OverrideFont ? s.h2Font : s.headingFont} !important; font-size: ${s.h2SizePt}pt !important; }
-.md2pdf-root h3 { font-family: ${s.h3OverrideFont ? s.h3Font : s.headingFont} !important; font-size: ${s.h3SizePt}pt !important; }
+.md2pdf-root h1 { font-family: ${s.h1OverrideFont ? resolveFontCss(s.h1Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h1SizePt}pt !important; }
+.md2pdf-root h2 { font-family: ${s.h2OverrideFont ? resolveFontCss(s.h2Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h2SizePt}pt !important; }
+.md2pdf-root h3 { font-family: ${s.h3OverrideFont ? resolveFontCss(s.h3Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h3SizePt}pt !important; }
 .md2pdf-root h1:first-child { margin-top: 0 !important; }
 ${
 	s.pageBreakBeforeH1
@@ -94,7 +96,7 @@ ${
 }
 .md2pdf-root pre,
 .md2pdf-root code {
-	font-family: ${s.codeFont} !important;
+	font-family: ${resolveFontCss(s.codeFont)} !important;
 	font-size: ${s.codeSizePt}pt !important;
 }
 .md2pdf-root pre,
@@ -143,6 +145,7 @@ const hideUiElements = `
 <title>${escapeHtml(opts.title)}</title>
 <style>${reset}</style>
 <style>${opts.appCss}</style>
+<style>${opts.fontFaceCss}</style>
 <style>${hideUiElements}</style>
 <style>${css}</style>
 </head>

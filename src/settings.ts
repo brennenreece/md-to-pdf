@@ -1,5 +1,14 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type MdToPdfPlugin from "./main";
+import {
+	BUNDLED_FAMILIES,
+	COLLECTION_LABELS,
+	bundledFontKey,
+	findBundledFamily,
+	loadPreviewFont,
+	resolveFontCss,
+} from "./fonts";
+import { applyTheme, snapshotTheme } from "./themes";
 
 export type PageSize = "A4" | "A5" | "Letter" | "Legal";
 export type Orientation = "portrait" | "landscape";
@@ -195,6 +204,9 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.fontSetting(containerEl, "Code font family", "codeFont");
 		this.numberSetting(containerEl, "Code size (pt)", "codeSizePt");
 
+		containerEl.createEl("h2", { text: "Themes" });
+		this.themeSettings(containerEl);
+
 		containerEl.createEl("h2", { text: "Header and footer" });
 
 		new Setting(containerEl).setName("Show header").addToggle((t) =>
@@ -213,6 +225,69 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.textSetting(containerEl, "Page number format ({page}, {pages})", "pageNumberFormat");
 	}
 
+	/** Save, load, and delete named themes, and reset all styling to defaults. */
+	private themeSettings(el: HTMLElement) {
+		const themes = this.plugin.themes;
+		let nameValue = "";
+
+		new Setting(el)
+			.setName("Save current style as theme")
+			.setDesc("Stores page, margin, font, heading, code, and header/footer settings under this name.")
+			.addText((t) => t.setPlaceholder("Theme name").onChange((v) => (nameValue = v.trim())))
+			.addButton((b) =>
+				b.setButtonText("Save").setCta().onClick(async () => {
+					if (!nameValue) return;
+					const snapshot = snapshotTheme(this.plugin.settings);
+					const existing = themes.find((t) => t.name === nameValue);
+					if (existing) existing.settings = snapshot;
+					else themes.push({ name: nameValue, settings: snapshot });
+					await this.plugin.saveSettings();
+					this.display();
+				}),
+			);
+
+		if (themes.length === 0) {
+			new Setting(el).setName("No saved themes yet").setDesc("Saved themes appear here.");
+		} else {
+			let selected = themes[0].name;
+			new Setting(el)
+				.setName("Saved themes")
+				.addDropdown((d) => {
+					for (const t of themes) d.addOption(t.name, t.name);
+					d.setValue(selected).onChange((v) => (selected = v));
+				})
+				.addButton((b) =>
+					b.setButtonText("Load").onClick(async () => {
+						const theme = themes.find((t) => t.name === selected);
+						if (!theme) return;
+						applyTheme(this.plugin.settings, theme.settings);
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+				)
+				.addButton((b) =>
+					b.setButtonText("Delete").setWarning().onClick(async () => {
+						const idx = themes.findIndex((t) => t.name === selected);
+						if (idx < 0) return;
+						themes.splice(idx, 1);
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+				);
+		}
+
+		new Setting(el)
+			.setName("Reset to defaults")
+			.setDesc("Restores the built-in style. Saved themes are kept.")
+			.addButton((b) =>
+				b.setButtonText("Reset").onClick(async () => {
+					applyTheme(this.plugin.settings, snapshotTheme(DEFAULT_SETTINGS));
+					await this.plugin.saveSettings();
+					this.display();
+				}),
+			);
+	}
+
 	private marginSetting(el: HTMLElement, side: string, key: MarginKey) {
 		new Setting(el).setName(`${side} margin (mm)`).addText((t) =>
 			t.setValue(String(this.plugin.settings[key])).onChange(async (v) => {
@@ -225,19 +300,58 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		);
 	}
 
-	/** Font dropdown. Includes the current value if it is not in the preset list. */
+	/**
+	 * One font dropdown for every font: system stacks, then the TeX Gyre and League groups.
+	 * The preview line under the control shows the chosen font.
+	 */
 	private fontSetting(el: HTMLElement, name: string, key: TextKey) {
-		new Setting(el).setName(name).addDropdown((d) => {
-			const current = this.plugin.settings[key];
-			const options: Record<string, string> = { ...FONT_OPTIONS };
-			if (!(current in options)) options[current] = current;
-			d.addOptions(options)
-				.setValue(current)
-				.onChange(async (v) => {
-					this.plugin.settings[key] = v;
-					await this.plugin.saveSettings();
-				});
+		const setting = new Setting(el).setName(name);
+		const preview = setting.descEl.createDiv({
+			cls: "md2pdf-font-preview",
+			text: "The quick brown fox jumps over the lazy dog.",
 		});
+
+		const applyPreview = (value: string) => {
+			preview.style.fontFamily = resolveFontCss(value);
+			const family = findBundledFamily(value);
+			if (family) {
+				loadPreviewFont(this.app.vault.adapter, this.plugin.manifest.dir ?? "", family)
+					.then(() => (preview.style.fontFamily = resolveFontCss(value)))
+					.catch(() => undefined);
+			}
+		};
+
+		setting.addDropdown((d) => {
+			const current = this.plugin.settings[key];
+			const select = d.selectEl;
+			select.empty();
+
+			const system = document.createElement("optgroup");
+			system.label = COLLECTION_LABELS.system;
+			for (const [value, label] of Object.entries(FONT_OPTIONS)) {
+				system.appendChild(new Option(label, value));
+			}
+			select.appendChild(system);
+
+			for (const collection of ["tg", "league"] as const) {
+				const group = document.createElement("optgroup");
+				group.label = COLLECTION_LABELS[collection];
+				for (const family of BUNDLED_FAMILIES.filter((f) => f.collection === collection)) {
+					group.appendChild(new Option(family.name, bundledFontKey(family)));
+				}
+				select.appendChild(group);
+			}
+
+			const known = Array.from(select.options).some((o) => o.value === current);
+			if (!known) select.insertBefore(new Option(current, current), select.firstChild);
+
+			d.setValue(current).onChange(async (v) => {
+				this.plugin.settings[key] = v;
+				applyPreview(v);
+				await this.plugin.saveSettings();
+			});
+		});
+		applyPreview(this.plugin.settings[key]);
 	}
 
 	/**

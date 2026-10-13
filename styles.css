@@ -1,0 +1,9 @@
+.md2pdf-font-preview {
+	margin-top: 4px;
+	font-size: 1.1em;
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}

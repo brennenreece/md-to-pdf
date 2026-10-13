@@ -2,12 +2,15 @@ import { Component, Notice, Platform, Plugin, TFile } from "obsidian";
 import { DEFAULT_SETTINGS, MdToPdfSettings, MdToPdfSettingTab } from "./settings";
 import { renderNoteToHtml, collectAppCss, collectThemeCss } from "./render";
 import { buildDocumentHtml } from "./document";
+import { buildBundledFontFaces, fontKeysInUse } from "./fonts";
+import type { SavedTheme } from "./themes";
 import { printHtmlToPdf } from "./pdf";
 
 const FRONTMATTER_RE = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/;
 
 export default class MdToPdfPlugin extends Plugin {
 	settings: MdToPdfSettings = DEFAULT_SETTINGS;
+	themes: SavedTheme[] = [];
 
 	async onload() {
 		await this.loadSettings();
@@ -24,11 +27,13 @@ export default class MdToPdfPlugin extends Plugin {
 
 	async loadSettings() {
 		const saved = (await this.loadData()) ?? {};
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
+		const { themes, ...rest } = saved;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, rest);
+		this.themes = Array.isArray(themes) ? themes : [];
 	}
 
 	async saveSettings() {
-		await this.saveData(this.settings);
+		await this.saveData({ ...this.settings, themes: this.themes });
 	}
 
 	private async exportActiveNote() {
@@ -54,10 +59,16 @@ export default class MdToPdfPlugin extends Plugin {
 			const markdown = raw.replace(FRONTMATTER_RE, "");
 			const bodyHtml = await renderNoteToHtml(this.app, markdown, file.path, owner);
 
+			const fontFaceCss = await buildBundledFontFaces(
+				this.app.vault.adapter,
+				this.manifest.dir ?? "",
+				fontKeysInUse(this.settings),
+			);
 			const html = buildDocumentHtml({
 				title: file.basename,
 				bodyHtml,
 				appCss: collectAppCss() + "\n" + (await collectThemeCss(this.app)),
+				fontFaceCss,
 				settings: this.settings,
 			});
 			const pdf = await printHtmlToPdf(html, this.settings, file.basename);

@@ -8,6 +8,19 @@ The export renders the note with Obsidian's own markdown renderer, so custom cod
 
 Early development. Export works for body content, page setup, typography, headers, and page numbers. BRNotation staff notation is still being refined.
 
+### Fonts
+
+The font dropdown lists the system stacks, then two bundled collections:
+
+- **TeX Gyre**: Adventor, Bonum, Cursor, Heros, Heros Condensed, Pagella, Schola, Termes. Licensed under the GUST Font License (`assets/fonts/tg/LICENSE-GFL.txt`).
+- **League of Moveable Type**: all families in the collection, licensed under the SIL Open Font License 1.1 (`assets/fonts/league/LICENSE-OFL.txt`). See `assets/fonts/league/NOTICE.md` for copyright notices.
+
+TeX Gyre Chorus is not bundled because the archive only includes its medium italic face.
+
+### Themes
+
+Use **Save current style as theme** to store the page, margin, font, heading, code, and header/footer settings under a name. Load, delete, or reset from the Themes section. Themes are stored in the plugin's data file.
+
 ## Development
 
 ```bash

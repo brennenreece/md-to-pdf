@@ -18,9 +18,13 @@ Goal: export Obsidian notes to PDFs that match the reading preview exactly, incl
 - `---` horizontal rules start a new page (on by default, can be turned off).
 - Header text and page number format, with `{{title}}`, `{{page}}`, `{{pages}}` tokens.
 - Code font and size.
+- Bundled font collections: TeX Gyre (8 families) and League of Moveable Type (all families). One grouped font dropdown for all fonts, with a preview line.
+- Themes: save, load, and delete named style presets, and reset to defaults. Stored in plugin data.
 
 ### Needs verification in Obsidian
 - `---` page breaks, and the global heading font with per-level overrides (built, not yet exported in the app).
+- Bundled fonts in the export: TeX Gyre and League families render in the PDF, and the preview line in settings updates.
+- Themes: save, load, delete, and reset.
 
 ## Next
 
@@ -60,6 +64,8 @@ Goal: export Obsidian notes to PDFs that match the reading preview exactly, incl
 - Automated tests for the document builder (settings to CSS) and the pagination logic.
 
 ## Known issues and open questions
+- TeX Gyre Chorus is not bundled. The archive only has its medium italic face.
+- Bundled fonts are read from the plugin folder at export time. Only fonts used by the note are embedded in the PDF.
 - Full app CSS hides content when printed, so only a filtered set of rules is copied. New Obsidian theme rules may need to be added to the filter.
 - Printing waits a fixed 500 ms after load. A load-complete signal would be more reliable.
 - Settings for page size and margins are not yet previewed live.
