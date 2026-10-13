@@ -26,20 +26,12 @@ export async function renderNoteToHtml(
 	child.load();
 
 	try {
-		console.log("[md-to-pdf render] Starting render");
 		await MarkdownRenderer.render(app, markdown, host, sourcePath, child);
-		console.log("[md-to-pdf render] Markdown rendered, waiting for settle");
 		await waitForSettled(host);
-		console.log("[md-to-pdf render] Settled. Host HTML length:", host.innerHTML.length);
-		logBrNotationDiagnostics(host);
 		await captureCanvases(host);
-		console.log("[md-to-pdf render] Canvases captured");
 		await inlineImages(host);
-		console.log("[md-to-pdf render] Images inlined");
 		unwrapInternalLinks(host);
-		logPreSerializeGlyphs(host);
 		const result = host.innerHTML;
-		console.log("[md-to-pdf render] Final HTML length:", result.length);
 		return result;
 	} catch (err) {
 		console.error("[md-to-pdf render] Error:", err);
@@ -209,30 +201,4 @@ async function collectBrNotationFontsCss(app: App): Promise<string> {
 		console.warn("[md-to-pdf] Could not read BRNotation fonts", err);
 		return "";
 	}
-}
-
-/** Logs the live glyph text and font for BRNotation's staff elements, to compare preview vs. export. */
-function logBrNotationDiagnostics(host: HTMLElement): void {
-	const selectors = [".vf-clef text", ".vf-timesignature text", ".vf-notehead text", ".vf-stavenote path"];
-	for (const sel of selectors) {
-		const el = host.querySelector(sel) as SVGElement | null;
-		if (!el) {
-			console.log(`[md-to-pdf diag] ${sel}: no element`);
-			continue;
-		}
-		const text = el.textContent ?? "";
-		const codes = Array.from(text).map((c) => c.codePointAt(0)?.toString(16)).join(",");
-		console.log(`[md-to-pdf diag] ${sel}: textLength=${text.length} codes=[${codes}] font=${getComputedStyle(el).fontFamily} outerHTML=${el.outerHTML.slice(0, 160)}`);
-	}
-	console.log("[md-to-pdf diag] fonts loaded:", Array.from((document as unknown as { fonts: Iterable<FontFace> }).fonts).map((f) => `${f.family}:${f.status}`).join(" "));
-}
-
-/** Logs notehead glyph code points just before serialization, to see whether innerHTML keeps them. */
-function logPreSerializeGlyphs(host: HTMLElement): void {
-	const texts = Array.from(host.querySelectorAll(".vf-notehead text"));
-	const codes = texts.map((t) => Array.from(t.textContent ?? "").map((c) => c.codePointAt(0)?.toString(16)).join("+") || "EMPTY");
-	console.log(`[md-to-pdf diag] pre-serialize noteheads=${texts.length} codes=${codes.slice(0, 5).join(" ")}`);
-	const html = host.innerHTML;
-	const n = (html.match(/\ue0a4/g) ?? []).length;
-	console.log(`[md-to-pdf diag] innerHTML contains U+E0A4 ${n} times`);
 }

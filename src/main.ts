@@ -58,8 +58,6 @@ export default class MdToPdfPlugin extends Plugin {
 			const raw = await this.app.vault.read(file);
 			const markdown = raw.replace(FRONTMATTER_RE, "");
 			const bodyHtml = await renderNoteToHtml(this.app, markdown, file.path, owner);
-			console.log("[md-to-pdf] Rendered HTML length:", bodyHtml.length);
-			console.log("[md-to-pdf] First 200 chars:", bodyHtml.slice(0, 200));
 
 			const html = buildDocumentHtml({
 				title: file.basename,
@@ -67,7 +65,6 @@ export default class MdToPdfPlugin extends Plugin {
 				appCss: collectAppCss() + "\n" + (await collectThemeCss(this.app)),
 				settings: this.settings,
 			});
-			console.log("[md-to-pdf] Full document length:", html.length);
 			const pdf = await printHtmlToPdf(html, this.settings, file.basename);
 
 			const outPath = file.path.replace(/\.md$/, ".pdf");

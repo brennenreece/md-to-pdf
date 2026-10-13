@@ -30,12 +30,9 @@ export async function printHtmlToPdf(
 	const os = require("os") as typeof import("os");
 	const path = require("path") as typeof import("path");
 
-	console.log("[md-to-pdf pdf] Starting PDF generation, HTML length:", html.length);
 	const BrowserWindow = getBrowserWindow();
-	const tmpFile = path.join(os.homedir(), `Desktop/md2pdf-debug-${Date.now()}.html`);
-	console.log("[md-to-pdf pdf] Temp file:", tmpFile);
+	const tmpFile = path.join(os.tmpdir(), `md2pdf-${Date.now()}.html`);
 	fs.writeFileSync(tmpFile, html, "utf8");
-	console.log("[md-to-pdf pdf] HTML written to disk");
 
 	const win = new BrowserWindow({
 		show: false,
@@ -43,18 +40,14 @@ export async function printHtmlToPdf(
 		height: 1200,
 		webPreferences: { nodeIntegration: false, sandbox: false },
 	});
-	console.log("[md-to-pdf pdf] Window created");
 
 	try {
 		await win.loadFile(tmpFile);
-		console.log("[md-to-pdf pdf] File loaded in window");
 		
 		// Allow page to render (wait for layout engine)
 		await new Promise((resolve) => setTimeout(resolve, 500));
-		console.log("[md-to-pdf pdf] Page render delay complete");
 		
 		const { headerTemplate, footerTemplate } = headerFooterTemplates(settings, title);
-		console.log("[md-to-pdf pdf] Calling printToPDF...");
 		const buffer: Uint8Array = await win.webContents.printToPDF({
 			printBackground: true,
 			preferCSSPageSize: true,
@@ -62,14 +55,12 @@ export async function printHtmlToPdf(
 			headerTemplate,
 			footerTemplate,
 		});
-		console.log("[md-to-pdf pdf] PDF generated, size:", buffer.byteLength);
 		return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
 	} catch (err) {
 		console.error("[md-to-pdf pdf] Error:", err);
 		throw err;
 	} finally {
 		win.destroy();
-		console.log("[md-to-pdf pdf] Debug HTML kept at:", tmpFile);
-		// fs.unlink(tmpFile, () => undefined);
+		fs.unlink(tmpFile, () => undefined);
 	}
 }
