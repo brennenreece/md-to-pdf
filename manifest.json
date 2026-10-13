@@ -1,0 +1,10 @@
+{
+  "id": "md-to-pdf",
+  "name": "Markdown to PDF",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Export notes to styled PDFs with a live preview pane.",
+  "author": "",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
