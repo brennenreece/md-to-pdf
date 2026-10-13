@@ -83,9 +83,9 @@ html, body {
 	break-after: avoid !important;
 	page-break-after: avoid !important;
 }
-.md2pdf-root h1 { font-family: ${s.h1Font} !important; font-size: ${s.h1SizePt}pt !important; }
-.md2pdf-root h2 { font-family: ${s.h2Font} !important; font-size: ${s.h2SizePt}pt !important; }
-.md2pdf-root h3 { font-family: ${s.h3Font} !important; font-size: ${s.h3SizePt}pt !important; }
+.md2pdf-root h1 { font-family: ${s.h1OverrideFont ? s.h1Font : s.headingFont} !important; font-size: ${s.h1SizePt}pt !important; }
+.md2pdf-root h2 { font-family: ${s.h2OverrideFont ? s.h2Font : s.headingFont} !important; font-size: ${s.h2SizePt}pt !important; }
+.md2pdf-root h3 { font-family: ${s.h3OverrideFont ? s.h3Font : s.headingFont} !important; font-size: ${s.h3SizePt}pt !important; }
 .md2pdf-root h1:first-child { margin-top: 0 !important; }
 ${
 	s.pageBreakBeforeH1

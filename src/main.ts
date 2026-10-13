@@ -24,11 +24,6 @@ export default class MdToPdfPlugin extends Plugin {
 
 	async loadSettings() {
 		const saved = (await this.loadData()) ?? {};
-		// Older versions had one shared heading font; carry it into each level.
-		if (saved.headingFont && !saved.h1Font) {
-			saved.h1Font = saved.h2Font = saved.h3Font = saved.headingFont;
-		}
-		delete saved.headingFont;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
 	}
 

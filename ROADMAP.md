@@ -13,14 +13,14 @@ Goal: export Obsidian notes to PDFs that match the reading preview exactly, incl
 - BRNotation staff elements (clef, time signature, noteheads, stems, beams) export correctly.
 - Page setup: size, orientation, margins.
 - Body text: font, size, line height, paragraph spacing.
-- Per-level heading fonts (H1, H2, H3), sizes, and spacing.
+- Global heading font, with per-level override switches (H1, H2, H3), and heading sizes and spacing.
 - "Start each H1 on a new page" toggle on the H1 size row.
 - `---` horizontal rules start a new page (on by default, can be turned off).
 - Header text and page number format, with `{{title}}`, `{{page}}`, `{{pages}}` tokens.
 - Code font and size.
 
 ### Needs verification in Obsidian
-- `---` page breaks and the per-level font dropdowns (built, not yet exported in the app).
+- `---` page breaks, and the global heading font with per-level overrides (built, not yet exported in the app).
 
 ## Next
 

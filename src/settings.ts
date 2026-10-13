@@ -18,6 +18,10 @@ export interface MdToPdfSettings {
 	bodyLineHeight: number;
 	paragraphSpacingEm: number;
 
+	headingFont: string;
+	h1OverrideFont: boolean;
+	h2OverrideFont: boolean;
+	h3OverrideFont: boolean;
 	h1Font: string;
 	h2Font: string;
 	h3Font: string;
@@ -54,6 +58,10 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	bodyLineHeight: 1.5,
 	paragraphSpacingEm: 0.8,
 
+	headingFont: "Helvetica, Arial, sans-serif",
+	h1OverrideFont: false,
+	h2OverrideFont: false,
+	h3OverrideFont: false,
 	h1Font: "Helvetica, Arial, sans-serif",
 	h2Font: "Helvetica, Arial, sans-serif",
 	h3Font: "Helvetica, Arial, sans-serif",
@@ -79,6 +87,7 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 
 type TextKey =
 	| "bodyFont"
+	| "headingFont"
 	| "h1Font"
 	| "h2Font"
 	| "h3Font"
@@ -114,6 +123,7 @@ type NumberKey =
 	| "headingSpaceBeforeEm"
 	| "headingSpaceAfterEm"
 	| "codeSizePt";
+type BoolKey = "h1OverrideFont" | "h2OverrideFont" | "h3OverrideFont";
 type MarginKey = "marginTopMm" | "marginRightMm" | "marginBottomMm" | "marginLeftMm";
 
 export class MdToPdfSettingTab extends PluginSettingTab {
@@ -166,9 +176,10 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 
 		containerEl.createEl("h2", { text: "Headings" });
 
-		this.headingSetting(containerEl, "H1", "h1Font", "h1SizePt", true);
-		this.headingSetting(containerEl, "H2", "h2Font", "h2SizePt");
-		this.headingSetting(containerEl, "H3", "h3Font", "h3SizePt");
+		this.fontSetting(containerEl, "Heading font (all levels)", "headingFont");
+		this.headingSetting(containerEl, "H1", "h1Font", "h1SizePt", "h1OverrideFont", true);
+		this.headingSetting(containerEl, "H2", "h2Font", "h2SizePt", "h2OverrideFont");
+		this.headingSetting(containerEl, "H3", "h3Font", "h3SizePt", "h3OverrideFont");
 		this.numberSetting(containerEl, "Space before headings (em)", "headingSpaceBeforeEm");
 		this.numberSetting(containerEl, "Space after headings (em)", "headingSpaceAfterEm");
 		new Setting(containerEl).setName("Page breaks").setHeading();
@@ -229,15 +240,26 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		});
 	}
 
-	/** One heading level: font dropdown and size. H1 also gets the new-page toggle on its size row. */
+	/**
+	 * One heading level: an override switch, the level's own font (used only when the switch is on),
+	 * and size. H1 also gets the new-page toggle on its size row.
+	 */
 	private headingSetting(
 		el: HTMLElement,
 		level: string,
 		fontKey: TextKey,
 		sizeKey: NumberKey,
+		overrideKey: BoolKey,
 		withPageBreak = false,
 	) {
-		this.fontSetting(el, `${level} font`, fontKey);
+		new Setting(el).setName(`${level} uses its own font`).addToggle((t) =>
+			t.setValue(this.plugin.settings[overrideKey]).onChange(async (v) => {
+				this.plugin.settings[overrideKey] = v;
+				await this.plugin.saveSettings();
+				this.display();
+			}),
+		);
+		if (this.plugin.settings[overrideKey]) this.fontSetting(el, `${level} font`, fontKey);
 		const row = new Setting(el).setName(`${level} size (pt)`).addText((t) =>
 			t.setValue(String(this.plugin.settings[sizeKey])).onChange(async (v) => {
 				const n = parseFloat(v);
