@@ -173,6 +173,17 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	/** Re-renders the page while keeping the scroll position, so changing a control doesn't jump to the top. */
+	private refresh(): void {
+		const scroller = this.containerEl.closest(".vertical-tab-content") as HTMLElement | null;
+		const top = scroller?.scrollTop ?? 0;
+		this.display();
+		if (!scroller) return;
+		scroller.scrollTop = top;
+		// Font previews load asynchronously and grow the page; restore again once they settle.
+		window.setTimeout(() => (scroller.scrollTop = top), 300);
+	}
+
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
@@ -273,7 +284,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 					if (existing) existing.settings = snapshot;
 					else themes.push({ name: nameValue, settings: snapshot });
 					await this.plugin.saveSettings();
-					this.display();
+					this.refresh();
 				}),
 			);
 
@@ -293,7 +304,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 						if (!theme) return;
 						applyTheme(this.plugin.settings, theme.settings);
 						await this.plugin.saveSettings();
-						this.display();
+						this.refresh();
 					}),
 				)
 				.addButton((b) =>
@@ -302,7 +313,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 						if (idx < 0) return;
 						themes.splice(idx, 1);
 						await this.plugin.saveSettings();
-						this.display();
+						this.refresh();
 					}),
 				);
 		}
@@ -314,7 +325,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 				b.setButtonText("Reset").onClick(async () => {
 					applyTheme(this.plugin.settings, snapshotTheme(DEFAULT_SETTINGS));
 					await this.plugin.saveSettings();
-					this.display();
+					this.refresh();
 				}),
 			);
 	}
@@ -364,7 +375,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			d.setValue(current).onChange(async (v) => {
 				this.plugin.settings[key] = v;
 				await this.plugin.saveSettings();
-				this.display();
+				this.refresh();
 			});
 		});
 
@@ -426,7 +437,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			t.setValue(this.plugin.settings[overrideKey]).onChange(async (v) => {
 				this.plugin.settings[overrideKey] = v;
 				await this.plugin.saveSettings();
-				this.display();
+				this.refresh();
 			}),
 		);
 		if (this.plugin.settings[overrideKey]) {
