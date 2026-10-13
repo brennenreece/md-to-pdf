@@ -76,7 +76,6 @@ html, body {
 .md2pdf-root h4,
 .md2pdf-root h5,
 .md2pdf-root h6 {
-	font-family: ${s.headingFont} !important;
 	color: #000 !important;
 	font-weight: 600 !important;
 	margin-top: ${s.headingSpaceBeforeEm}em !important;
@@ -84,9 +83,9 @@ html, body {
 	break-after: avoid !important;
 	page-break-after: avoid !important;
 }
-.md2pdf-root h1 { font-size: ${s.h1SizePt}pt !important; }
-.md2pdf-root h2 { font-size: ${s.h2SizePt}pt !important; }
-.md2pdf-root h3 { font-size: ${s.h3SizePt}pt !important; }
+.md2pdf-root h1 { font-family: ${s.h1Font} !important; font-size: ${s.h1SizePt}pt !important; }
+.md2pdf-root h2 { font-family: ${s.h2Font} !important; font-size: ${s.h2SizePt}pt !important; }
+.md2pdf-root h3 { font-family: ${s.h3Font} !important; font-size: ${s.h3SizePt}pt !important; }
 .md2pdf-root h1:first-child { margin-top: 0 !important; }
 ${
 	s.pageBreakBeforeH1
@@ -123,6 +122,11 @@ ${
 }
 .md2pdf-root a { color: inherit !important; text-decoration: none !important; }
 .md2pdf-root .frontmatter-container, .md2pdf-root .metadata-container { display: none !important; }
+${
+	s.pageBreakOnHr
+		? ".md2pdf-root hr { break-before: page !important; page-break-before: always !important; border: 0 !important; margin: 0 !important; height: 0 !important; }"
+		: ".md2pdf-root hr { display: none !important; }"
+}
 `;
 
 const hideUiElements = `

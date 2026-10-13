@@ -18,13 +18,16 @@ export interface MdToPdfSettings {
 	bodyLineHeight: number;
 	paragraphSpacingEm: number;
 
-	headingFont: string;
+	h1Font: string;
+	h2Font: string;
+	h3Font: string;
 	h1SizePt: number;
 	h2SizePt: number;
 	h3SizePt: number;
 	headingSpaceBeforeEm: number;
 	headingSpaceAfterEm: number;
 	pageBreakBeforeH1: boolean;
+	pageBreakOnHr: boolean;
 
 	codeFont: string;
 	codeSizePt: number;
@@ -51,13 +54,16 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	bodyLineHeight: 1.5,
 	paragraphSpacingEm: 0.8,
 
-	headingFont: "Helvetica, Arial, sans-serif",
+	h1Font: "Helvetica, Arial, sans-serif",
+	h2Font: "Helvetica, Arial, sans-serif",
+	h3Font: "Helvetica, Arial, sans-serif",
 	h1SizePt: 22,
 	h2SizePt: 16,
 	h3SizePt: 13,
 	headingSpaceBeforeEm: 1.2,
 	headingSpaceAfterEm: 0.5,
 	pageBreakBeforeH1: false,
+	pageBreakOnHr: true,
 
 	codeFont: "Menlo, Consolas, monospace",
 	codeSizePt: 9,
@@ -71,7 +77,33 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	pageNumberAlign: "right",
 };
 
-type TextKey = "bodyFont" | "headingFont" | "codeFont" | "headerText" | "pageNumberFormat";
+type TextKey =
+	| "bodyFont"
+	| "h1Font"
+	| "h2Font"
+	| "h3Font"
+	| "codeFont"
+	| "headerText"
+	| "pageNumberFormat";
+
+/** Fonts offered in the dropdowns. Each value is a CSS font-family stack. */
+export const FONT_OPTIONS: Record<string, string> = {
+	"Georgia, 'Times New Roman', serif": "Georgia (serif)",
+	"'Times New Roman', Times, serif": "Times New Roman",
+	"Palatino, 'Palatino Linotype', serif": "Palatino",
+	"'Book Antiqua', Palatino, serif": "Book Antiqua",
+	"Garamond, 'EB Garamond', serif": "Garamond",
+	"'Charter', 'Bitstream Charter', serif": "Charter",
+	"Helvetica, Arial, sans-serif": "Helvetica / Arial",
+	"'Helvetica Neue', Helvetica, Arial, sans-serif": "Helvetica Neue",
+	"Inter, 'Helvetica Neue', Arial, sans-serif": "Inter",
+	"Avenir, 'Avenir Next', sans-serif": "Avenir",
+	"'Gill Sans', 'Gill Sans MT', sans-serif": "Gill Sans",
+	"Verdana, Geneva, sans-serif": "Verdana",
+	"Menlo, Consolas, monospace": "Menlo / Consolas",
+	"'Courier New', Courier, monospace": "Courier New",
+	"'SF Mono', Monaco, monospace": "SF Mono",
+};
 type NumberKey =
 	| "bodySizePt"
 	| "bodyLineHeight"
@@ -127,29 +159,29 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 
 		containerEl.createEl("h2", { text: "Body text" });
 
-		this.textSetting(containerEl, "Font family", "bodyFont");
+		this.fontSetting(containerEl, "Font family", "bodyFont");
 		this.numberSetting(containerEl, "Font size (pt)", "bodySizePt");
 		this.numberSetting(containerEl, "Line height", "bodyLineHeight");
 		this.numberSetting(containerEl, "Paragraph spacing (em)", "paragraphSpacingEm");
 
 		containerEl.createEl("h2", { text: "Headings" });
 
-		this.textSetting(containerEl, "Heading font family", "headingFont");
-		this.numberSetting(containerEl, "H1 size (pt)", "h1SizePt");
-		this.numberSetting(containerEl, "H2 size (pt)", "h2SizePt");
-		this.numberSetting(containerEl, "H3 size (pt)", "h3SizePt");
+		this.headingSetting(containerEl, "H1", "h1Font", "h1SizePt", true);
+		this.headingSetting(containerEl, "H2", "h2Font", "h2SizePt");
+		this.headingSetting(containerEl, "H3", "h3Font", "h3SizePt");
 		this.numberSetting(containerEl, "Space before headings (em)", "headingSpaceBeforeEm");
 		this.numberSetting(containerEl, "Space after headings (em)", "headingSpaceAfterEm");
-		new Setting(containerEl).setName("Start each H1 on a new page").addToggle((t) =>
-			t.setValue(s.pageBreakBeforeH1).onChange(async (v) => {
-				s.pageBreakBeforeH1 = v;
+		new Setting(containerEl).setName("Page breaks").setHeading();
+		new Setting(containerEl).setName("Page break at horizontal rule (---)").addToggle((t) =>
+			t.setValue(s.pageBreakOnHr).onChange(async (v) => {
+				s.pageBreakOnHr = v;
 				await save();
 			}),
 		);
 
 		containerEl.createEl("h2", { text: "Code" });
 
-		this.textSetting(containerEl, "Code font family", "codeFont");
+		this.fontSetting(containerEl, "Code font family", "codeFont");
 		this.numberSetting(containerEl, "Code size (pt)", "codeSizePt");
 
 		containerEl.createEl("h2", { text: "Header and footer" });
@@ -180,6 +212,52 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 				}
 			}),
 		);
+	}
+
+	/** Font dropdown. Includes the current value if it is not in the preset list. */
+	private fontSetting(el: HTMLElement, name: string, key: TextKey) {
+		new Setting(el).setName(name).addDropdown((d) => {
+			const current = this.plugin.settings[key];
+			const options: Record<string, string> = { ...FONT_OPTIONS };
+			if (!(current in options)) options[current] = current;
+			d.addOptions(options)
+				.setValue(current)
+				.onChange(async (v) => {
+					this.plugin.settings[key] = v;
+					await this.plugin.saveSettings();
+				});
+		});
+	}
+
+	/** One heading level: font dropdown and size. H1 also gets the new-page toggle on its size row. */
+	private headingSetting(
+		el: HTMLElement,
+		level: string,
+		fontKey: TextKey,
+		sizeKey: NumberKey,
+		withPageBreak = false,
+	) {
+		this.fontSetting(el, `${level} font`, fontKey);
+		const row = new Setting(el).setName(`${level} size (pt)`).addText((t) =>
+			t.setValue(String(this.plugin.settings[sizeKey])).onChange(async (v) => {
+				const n = parseFloat(v);
+				if (!Number.isNaN(n) && n > 0) {
+					this.plugin.settings[sizeKey] = n;
+					await this.plugin.saveSettings();
+				}
+			}),
+		);
+		if (withPageBreak) {
+			row.addToggle((t) =>
+				t
+					.setTooltip(`Start each ${level} on a new page`)
+					.setValue(this.plugin.settings.pageBreakBeforeH1)
+					.onChange(async (v) => {
+						this.plugin.settings.pageBreakBeforeH1 = v;
+						await this.plugin.saveSettings();
+					}),
+			);
+		}
 	}
 
 	private textSetting(el: HTMLElement, name: string, key: TextKey) {
