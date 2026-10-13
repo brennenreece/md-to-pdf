@@ -215,7 +215,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.marginSetting(containerEl, "Left", "marginLeftMm");
 
 		new Setting(containerEl).setName("Body text").setHeading();
-		this.fontSetting(containerEl, "Body font", "bodyFont", s.bodySizePt);
+		this.fontSetting(containerEl, "Body font", "bodyFont", s.bodySizePt, "bodyWeight");
 		this.weightSetting(containerEl, "Body weight", "bodyFont", null, "bodyWeight");
 		new Setting(containerEl).setName("Body italic").addToggle((t) =>
 			t.setValue(s.bodyItalic).onChange(async (v) => {
@@ -347,7 +347,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 	 * The preview lists every face of the chosen family with its label. Weight and italic are
 	 * Weight and italic have their own rows.
 	 */
-	private fontSetting(el: HTMLElement, name: string, key: TextKey, sizePt: number) {
+	private fontSetting(el: HTMLElement, name: string, key: TextKey, sizePt: number, weightKey?: WeightKey) {
 		new Setting(el).setName(name).addDropdown((d) => {
 			const current = this.plugin.settings[key];
 			const select = d.selectEl;
@@ -379,14 +379,15 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			});
 		});
 
-		this.fontPreview(el, this.plugin.settings[key], sizePt);
+		this.fontPreview(el, this.plugin.settings[key], sizePt, weightKey);
 	}
 
 	/**
-	 * Labeled preview lines for the chosen font. Bundled families show each face (Regular, Italic,
-	 * Bold, Bold Italic, and any other weights). System stacks show a single regular line.
+	 * Labeled preview lines for the chosen font, drawn at the role's size. Bundled families show each
+	 * face. When a weight key is given, each upright face gets a radio button that selects that weight.
+	 * System stacks show a single regular line.
 	 */
-	private fontPreview(el: HTMLElement, value: string, sizePt: number) {
+	private fontPreview(el: HTMLElement, value: string, sizePt: number, weightKey?: WeightKey) {
 		const box = el.createDiv({ cls: "md2pdf-font-preview" });
 		const family = findBundledFamily(value);
 
@@ -400,7 +401,16 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			.then(() => {
 				status.remove();
 				for (const face of family.faces) {
-					this.previewLine(box, faceLabel(face), resolveFontCss(value), face.italic ? "italic" : "normal", face.weight, sizePt);
+					const radio = weightKey && !face.italic ? { name: `md2pdf-${weightKey}`, weight: face.weight, key: weightKey } : undefined;
+					this.previewLine(
+						box,
+						faceLabel(face),
+						resolveFontCss(value),
+						face.italic ? "italic" : "normal",
+						face.weight,
+						sizePt,
+						radio,
+					);
 				}
 			})
 			.catch((err) => {
@@ -409,8 +419,25 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			});
 	}
 
-	private previewLine(box: HTMLElement, label: string, family: string, style: string, weight: number, sizePt: number) {
+	private previewLine(
+		box: HTMLElement,
+		label: string,
+		family: string,
+		style: string,
+		weight: number,
+		sizePt: number,
+		radio?: { name: string; weight: number; key: WeightKey },
+	) {
 		const row = box.createDiv({ cls: "md2pdf-font-preview-row" });
+		if (radio) {
+			const input = row.createEl("input", { attr: { type: "radio", name: radio.name } });
+			input.checked = this.plugin.settings[radio.key] === radio.weight;
+			input.addEventListener("change", async () => {
+				if (!input.checked) return;
+				this.plugin.settings[radio.key] = radio.weight;
+				await this.plugin.saveSettings();
+			});
+		}
 		row.createSpan({ cls: "md2pdf-font-preview-label", text: label });
 		const sample = row.createSpan({ cls: "md2pdf-font-preview-sample", text: "The quick brown fox jumps over the lazy dog." });
 		sample.style.fontFamily = family;
@@ -441,7 +468,9 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			}),
 		);
 		if (this.plugin.settings[overrideKey]) {
-			this.fontSetting(el, `${level} font`, fontKey, this.plugin.settings[sizeKey]);
+			this.fontSetting(el, `${level} font`, fontKey, this.plugin.settings[sizeKey], weightKey);
+		} else {
+			this.fontPreview(el, this.plugin.settings.headingFont, this.plugin.settings[sizeKey], weightKey);
 		}
 		this.weightSetting(el, `${level} weight`, fontKey, overrideKey, weightKey);
 		new Setting(el).setName(`${level} italic`).addToggle((t) =>
@@ -473,38 +502,16 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Weight picker for a text role. Bundled families with several weights get a radio group; others get a dropdown. System
-	 * fonts list the common weights. Lists the weight the font's own family provides.
+	 * Weight dropdown for a text role. Bundled families choose their weight with radio buttons in the
+	 * font preview instead, so this only handles system fonts.
 	 */
 	private weightSetting(el: HTMLElement, name: string, fontKey: TextKey, overrideKey: BoolKey | null, weightKey: WeightKey) {
 		const fontValue = overrideKey && !this.plugin.settings[overrideKey] ? this.plugin.settings.headingFont : this.plugin.settings[fontKey];
-		const family = findBundledFamily(fontValue);
-		const options: Array<[number, string]> = family
-			? Array.from(new Map(family.faces.map((f) => [f.weight, faceLabel({ ...f, italic: false })])).entries()).sort(
-					(a, b) => a[0] - b[0],
-				)
-			: SYSTEM_WEIGHTS;
+		if (findBundledFamily(fontValue)) return;
 
 		const current = this.plugin.settings[weightKey];
+		const options: Array<[number, string]> = [...SYSTEM_WEIGHTS];
 		if (!options.some(([w]) => w === current)) options.push([current, `Weight ${current}`]);
-
-		if (family && options.length > 1) {
-			const setting = new Setting(el).setName(name);
-			const group = setting.controlEl.createDiv({ cls: "md2pdf-radio-group" });
-			const groupName = `md2pdf-${weightKey}-${fontKey}`;
-			for (const [w, label] of options) {
-				const item = group.createEl("label", { cls: "md2pdf-radio-option" });
-				const input = item.createEl("input", { attr: { type: "radio", name: groupName } });
-				input.checked = w === current;
-				item.createSpan({ text: label });
-				input.addEventListener("change", async () => {
-					if (!input.checked) return;
-					this.plugin.settings[weightKey] = w;
-					await this.plugin.saveSettings();
-				});
-			}
-			return;
-		}
 
 		new Setting(el).setName(name).addDropdown((d) => {
 			for (const [w, label] of options) d.addOption(String(w), label);

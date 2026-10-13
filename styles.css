@@ -34,17 +34,8 @@
 	min-width: 0;
 }
 
-.md2pdf-radio-group {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px 14px;
-	justify-content: flex-end;
-}
-
-.md2pdf-radio-option {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	cursor: pointer;
-	white-space: nowrap;
+.md2pdf-font-preview-row input[type="radio"] {
+	margin: 0;
+	align-self: center;
+	flex: 0 0 auto;
 }
