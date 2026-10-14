@@ -237,65 +237,65 @@ function baselineGridMarkup(s: MdToPdfSettings): string {
 }
 
 /**
- * Moves the first heading so its cap height touches the top margin. When the baseline grid is on,
- * the baseline goes to the first grid line that keeps the cap line at or below the margin.
- * Runs in the print window, so it measures the fonts that will actually be printed.
+ * Print-time layout pass. Without the baseline grid it moves the first heading so its cap height
+ * touches the top margin. With the grid on, it walks the top-level blocks in order and pads each
+ * one down to the next grid line below its first baseline, so text baselines land on the grid.
+ * Runs in the print window, after the fonts it will print have loaded.
  */
 function topCapScript(gridPt: number): string {
 	return `<script>
 (function () {
 	var gridPx = ${JSON.stringify(gridPt)} * 4 / 3;
-	function align() {
+	function measureFont(el) {
+		var cs = getComputedStyle(el);
+		var ctx = document.createElement('canvas').getContext('2d');
+		ctx.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+		return { m: ctx.measureText('H'), lh: parseFloat(cs.lineHeight) };
+	}
+	function alignCapLine() {
 		var root = document.querySelector('.md2pdf-root');
 		var h = root && root.firstElementChild;
 		if (!h || !/^H[1-6]$/.test(h.tagName)) return;
-		var cs = getComputedStyle(h);
-		var ctx = document.createElement('canvas').getContext('2d');
-		ctx.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
-		var m = ctx.measureText('H');
-		var cap = m.actualBoundingBoxAscent;
-		var lh = parseFloat(cs.lineHeight);
-		var half = (lh - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2;
-		var baselineInBox = half + m.fontBoundingBoxAscent;
-		var baseline = cap;
-		if (gridPx > 0) {
-			baseline = Math.max(1, Math.ceil(cap / gridPx)) * gridPx;
-		}
-		var shift = baseline - baselineInBox;
-		h.style.setProperty('margin-top', shift.toFixed(2) + 'px', 'important');
+		var f = measureFont(h);
+		var cap = f.m.actualBoundingBoxAscent;
+		var baselineInBox = (f.lh - (f.m.fontBoundingBoxAscent + f.m.fontBoundingBoxDescent)) / 2 + f.m.fontBoundingBoxAscent;
+		h.style.setProperty('margin-top', (cap - baselineInBox).toFixed(2) + 'px', 'important');
 	}
-	// Finds where the first line's text baseline sits, using a zero-size inline probe.
-	function baselineOf(el) {
+	// Zero-size inline probe: its bottom edge sits on the text baseline of the block's first line.
+	function baselineOf(el, root) {
 		var probe = document.createElement('span');
 		probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline;';
 		var target = el;
-		while (target && target.firstChild && target.firstChild.nodeType === 1 &&
-			!/^(P|H[1-6]|UL|OL|LI|BLOCKQUOTE)$/.test(target.firstChild.tagName)) {
-			target = target.firstChild;
+		while (target.firstElementChild && !/^(P|H[1-6]|PRE|TABLE)$/.test(target.tagName)) {
+			target = target.firstElementChild;
 		}
-		if (!target) return null;
 		target.insertBefore(probe, target.firstChild);
-		var y = probe.getBoundingClientRect().bottom + window.scrollY;
+		var y = probe.getBoundingClientRect().bottom - root.getBoundingClientRect().top;
 		probe.remove();
 		return y;
 	}
-	function lockBlocks() {
-		if (gridPx <= 0) return;
-		var kids = document.querySelectorAll('.md2pdf-root > *');
+	function lockToGrid() {
+		var root = document.querySelector('.md2pdf-root');
+		if (!root) return;
+		var kids = Array.prototype.slice.call(root.children);
 		for (var i = 0; i < kids.length; i++) {
 			var el = kids[i];
 			if (el.tagName === 'HR' || getComputedStyle(el).display === 'none') continue;
-			el.style.removeProperty('padding-top');
-			var base = baselineOf(el);
-			if (base === null) continue;
-			var rem = ((base % gridPx) + gridPx) % gridPx;
-			if (rem > 0.5 && gridPx - rem > 0.5) {
+			var rel = baselineOf(el, root);
+			// Next grid line at or below the current baseline. The first block never sits on the top edge.
+			var target = Math.ceil(rel / gridPx - 1e-6) * gridPx;
+			if (i === 0 && target <= 0) target = gridPx;
+			var delta = target - rel;
+			if (delta > 0.05) {
 				var cur = parseFloat(getComputedStyle(el).paddingTop) || 0;
-				el.style.setProperty('padding-top', (cur + gridPx - rem).toFixed(2) + 'px', 'important');
+				el.style.setProperty('padding-top', (cur + delta).toFixed(2) + 'px', 'important');
 			}
 		}
 	}
-	document.fonts.ready.then(function () { align(); lockBlocks(); });
+	document.fonts.ready.then(function () {
+		alignCapLine();
+		if (gridPx > 0) lockToGrid();
+	});
 })();
 </script>`;
 }
