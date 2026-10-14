@@ -110,6 +110,8 @@ export function contentCss(s: MdToPdfSettings): string {
 	width: 100%;
 	max-width: none;
 	padding: 0;
+	/* Stops the first heading's negative margin from collapsing out, which would shift the grid origin. */
+	display: flow-root;
 	margin: 0;
 	background: white;
 }
