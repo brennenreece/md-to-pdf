@@ -18,6 +18,8 @@ export class PdfPreviewView extends ItemView {
 	private renderSeq = 0;
 	/** Preview-only baseline grid overlay. Kept per view, not saved in settings. */
 	private showGrid = false;
+	/** Preview-only magenta margin guides. Kept per view, not saved in settings. */
+	private showMargins = false;
 
 	constructor(leaf: WorkspaceLeaf, plugin: MdToPdfPlugin) {
 		super(leaf);
@@ -52,6 +54,15 @@ export class PdfPreviewView extends ItemView {
 		gridLabel.createSpan({ text: "Baseline grid" });
 		gridToggle.addEventListener("change", () => {
 			this.showGrid = gridToggle.checked;
+			this.requestRender(true);
+		});
+
+		const marginLabel = toolbar.createEl("label", { cls: "md2pdf-preview-grid" });
+		const marginToggle = marginLabel.createEl("input", { attr: { type: "checkbox" } });
+		marginToggle.checked = this.showMargins;
+		marginLabel.createSpan({ text: "Margins" });
+		marginToggle.addEventListener("change", () => {
+			this.showMargins = marginToggle.checked;
 			this.requestRender(true);
 		});
 
@@ -106,7 +117,7 @@ export class PdfPreviewView extends ItemView {
 		const seq = ++this.renderSeq;
 		this.setStatus(`Rendering ${file.basename}…`);
 		try {
-			const html = await this.plugin.buildNoteDocument(file, undefined, { showBaselineGrid: this.showGrid });
+			const html = await this.plugin.buildNoteDocument(file, undefined, { showBaselineGrid: this.showGrid, showMargins: this.showMargins });
 			const pdf = await printHtmlToPdf(html, this.plugin.settings, file.basename);
 			if (seq !== this.renderSeq) return; // a newer render has started
 			this.showPdf(pdf);

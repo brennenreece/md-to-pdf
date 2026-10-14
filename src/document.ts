@@ -190,6 +190,23 @@ export function baselineOverlayCss(): string {
 `;
 }
 
+/** Preview-only magenta frame at the content-area edges (inside the page margins). */
+export function marginOverlayCss(s: MdToPdfSettings): string {
+	return `
+.md2pdf-margins {
+	position: fixed;
+	top: ${s.marginTopMm}mm;
+	right: ${s.marginRightMm}mm;
+	bottom: ${s.marginBottomMm}mm;
+	left: ${s.marginLeftMm}mm;
+	pointer-events: none;
+	z-index: 9998;
+	outline: 0.75pt solid rgba(255, 0, 255, 0.8);
+	outline-offset: 0;
+}
+`;
+}
+
 /** Grid line elements, each positioned by an inline top offset. */
 function baselineGridMarkup(s: MdToPdfSettings): string {
 	const step = s.baselineGridPt;
@@ -210,6 +227,8 @@ export function buildDocumentHtml(opts: {
 	settings: MdToPdfSettings;
 	/** Preview-only: draws the baseline grid over the page. */
 	showBaselineGrid?: boolean;
+	/** Preview-only: draws a magenta frame at the margin edges. */
+	showMargins?: boolean;
 }): string {
 	const s = opts.settings;
 	const reset = `
@@ -263,9 +282,11 @@ const hideUiElements = `
 <style>${hideUiElements}</style>
 <style>${css}</style>
 ${opts.showBaselineGrid ? `<style>${baselineOverlayCss()}</style>` : ""}
+${opts.showMargins ? `<style>${marginOverlayCss(s)}</style>` : ""}
 </head>
 <body>
 ${opts.showBaselineGrid ? baselineGridMarkup(s) : ""}
+${opts.showMargins ? '<div class="md2pdf-margins"></div>' : ""}
 <div class="md2pdf-root markdown-rendered">${opts.bodyHtml}</div>
 </body>
 </html>`;

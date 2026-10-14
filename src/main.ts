@@ -103,7 +103,7 @@ export default class MdToPdfPlugin extends Plugin {
 	async buildNoteDocument(
 		file: TFile,
 		settings: MdToPdfSettings = this.settings,
-		opts: { showBaselineGrid?: boolean } = {},
+		opts: { showBaselineGrid?: boolean; showMargins?: boolean } = {},
 	): Promise<string> {
 		const raw = await this.app.vault.read(file);
 		const markdown = raw.replace(FRONTMATTER_RE, "");
@@ -123,6 +123,7 @@ export default class MdToPdfPlugin extends Plugin {
 				fontFaceCss,
 				settings,
 				showBaselineGrid: opts.showBaselineGrid,
+				showMargins: opts.showMargins,
 			});
 		} finally {
 			owner.unload();
