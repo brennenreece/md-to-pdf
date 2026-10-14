@@ -1,5 +1,5 @@
 import type { Alignment, MdToPdfSettings } from "./settings";
-import { resolveFontCss } from "./fonts";
+import { findBundledFamily, resolveFontCss } from "./fonts";
 
 const PAGE_MM: Record<string, [number, number]> = {
 	A4: [210, 297],
@@ -512,11 +512,26 @@ export function headerFooterTemplates(
  * Page-number footer: centered, styled like H3, and vertically centered in the bottom margin.
  * The box fills the bottom margin, so centering the text puts it halfway between the page edge and the margin.
  */
+/**
+ * Shift that centers the cap height in the line box. Line boxes center between ascent and
+ * descent, which leaves a cap-height text high when the font's ascent exceeds its descent.
+ * Metrics are for the bundled League Gothic; other fonts use the default line box.
+ */
+function capCenterOffsetEm(family: string): number {
+	const bundled = findBundledFamily(family);
+	if (!bundled || bundled.id !== "league-gothic") return 0;
+	const ascent = 935 / 1000;
+	const descent = 265 / 1000;
+	const capHeight = 735 / 1000;
+	return capHeight / 2 - (ascent - descent) / 2;
+}
+
 function footerWrap(inner: string, s: MdToPdfSettings, fontFaceCss: string): string {
 	const family = s.h3OverrideFont ? s.h3Font : s.headingFont;
 	const css = `${fontFaceCss}
-.pf { width:100%; height:${s.marginBottomMm}mm; display:flex; align-items:center; justify-content:center; font-family:${resolveFontCss(family)} !important; font-size:${s.h3SizePt}pt; font-weight:${s.h3Weight}; font-style:normal; color:#000; }`;
-	return `<style>${css}</style><div class="pf">${inner}</div>`;
+.pf { width:100%; height:${s.marginBottomMm}mm; display:flex; align-items:center; justify-content:center; font-family:${resolveFontCss(family)} !important; font-size:${s.h3SizePt}pt; font-weight:${s.h3Weight}; font-style:normal; color:#000; }
+.pf > span { position:relative; top:${capCenterOffsetEm(family)}em; }`;
+	return `<style>${css}</style><div class="pf"><span>${inner}</span></div>`;
 }
 
 function wrapTemplate(inner: string, align: Alignment): string {
