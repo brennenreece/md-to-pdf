@@ -21,7 +21,7 @@ TeX Gyre Chorus is not bundled because the archive only includes its medium ital
 
 Set page margins in mm, cm, inches, points, or picas with the **Margin unit** dropdown. Values are stored in mm, so changing the unit only changes how they are shown.
 
-Heading line height is set under **Headings** (unitless, default 1, like the body line height). Use it to tighten or loosen multi-line headings.
+Line height for body text and headings is set with a value and a unit dropdown (**em** multiplies the font size, **pt** is an absolute size). Heading line height defaults to 1 em. Use it to tighten or loosen multi-line headings.
 
 Choose a font from the grouped dropdown. Headings and body text each have their own weight and italic settings. For bundled families, pick the variation with the radio button beside its preview. Previews are drawn at the chosen point size.
 
@@ -35,7 +35,7 @@ The **Typography** section in settings controls:
 - **Ligatures**. On by default. Turning them off disables `liga`, `clig`, and `dlig`.
 - **Oldstyle figures** (`onum`), if the font supports them.
 - **Small caps headings** (headings are set in small caps, with balanced line breaks).
-- **Baseline grid**. When enabled, paragraph and heading spacing snaps to multiples of the grid unit (in pt). This is an approximation: body line height is not forced to the grid.
+- **Baseline grid**. When enabled, body and heading line heights are whole multiples of the grid unit (in pt), block spacing snaps to half units, and each block's first baseline is moved onto a grid line. The first heading's cap height sits on the top margin, or on the first grid line below it when the grid is on.
 
 Hyphenation and justification are applied by Chromium's print engine, so they show in exported PDFs.
 

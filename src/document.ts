@@ -14,6 +14,25 @@ export function pageSizeCss(s: MdToPdfSettings): string {
 }
 
 /**
+ * CSS value for a line height. Grid mode pins it to a whole number of grid units so every
+ * line box, and so every baseline inside it, lands on the grid. Otherwise the user's value
+ * is used in its chosen unit (em multiplier or pt).
+ */
+export function lineHeightValue(
+	value: number,
+	unit: "em" | "pt",
+	fontPt: number,
+	s: MdToPdfSettings,
+): string {
+	if (s.baselineGridEnabled) {
+		const targetPt = unit === "pt" ? value : value * fontPt;
+		const units = Math.max(1, Math.round(targetPt / s.baselineGridPt));
+		return `calc(var(--md2pdf-baseline) * ${units})`;
+	}
+	return unit === "pt" ? `${value}pt` : `${value}em`;
+}
+
+/**
  * Typography rules: line breaking, hyphenation, justification, OpenType features, and an
  * optional baseline grid. Kept separate so the grid rules can be read on their own.
  */
@@ -86,7 +105,7 @@ export function contentCss(s: MdToPdfSettings): string {
 	font-weight: ${s.bodyWeight};
 	font-style: ${s.bodyItalic ? "italic" : "normal"};
 	font-size: ${s.bodySizePt}pt !important;
-	line-height: ${s.bodyLineHeight} !important;
+	line-height: ${lineHeightValue(s.bodyLineHeight, s.bodyLineHeightUnit, s.bodySizePt, s)} !important;
 	color: #111 !important;
 	width: 100%;
 	max-width: none;
@@ -114,13 +133,12 @@ ${typographyCss(s)}
 	color: #000 !important;
 	margin-top: ${s.headingSpaceBeforeEm}em !important;
 	margin-bottom: ${s.headingSpaceAfterEm}em !important;
-	line-height: ${s.headingLineHeight} !important;
 	break-after: avoid !important;
 	page-break-after: avoid !important;
 }
-.md2pdf-root h1 { font-family: ${s.h1OverrideFont ? resolveFontCss(s.h1Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h1SizePt}pt !important; font-weight: ${s.h1Weight} !important; font-style: ${s.h1Italic ? "italic" : "normal"} !important; }
-.md2pdf-root h2 { font-family: ${s.h2OverrideFont ? resolveFontCss(s.h2Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h2SizePt}pt !important; font-weight: ${s.h2Weight} !important; font-style: ${s.h2Italic ? "italic" : "normal"} !important; }
-.md2pdf-root h3 { font-family: ${s.h3OverrideFont ? resolveFontCss(s.h3Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h3SizePt}pt !important; font-weight: ${s.h3Weight} !important; font-style: ${s.h3Italic ? "italic" : "normal"} !important; }
+.md2pdf-root h1 { line-height: ${lineHeightValue(s.headingLineHeight, s.headingLineHeightUnit, s.h1SizePt, s)} !important; font-family: ${s.h1OverrideFont ? resolveFontCss(s.h1Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h1SizePt}pt !important; font-weight: ${s.h1Weight} !important; font-style: ${s.h1Italic ? "italic" : "normal"} !important; }
+.md2pdf-root h2 { line-height: ${lineHeightValue(s.headingLineHeight, s.headingLineHeightUnit, s.h2SizePt, s)} !important; font-family: ${s.h2OverrideFont ? resolveFontCss(s.h2Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h2SizePt}pt !important; font-weight: ${s.h2Weight} !important; font-style: ${s.h2Italic ? "italic" : "normal"} !important; }
+.md2pdf-root h3 { line-height: ${lineHeightValue(s.headingLineHeight, s.headingLineHeightUnit, s.h3SizePt, s)} !important; font-family: ${s.h3OverrideFont ? resolveFontCss(s.h3Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h3SizePt}pt !important; font-weight: ${s.h3Weight} !important; font-style: ${s.h3Italic ? "italic" : "normal"} !important; }
 .md2pdf-root h1:first-child { margin-top: 0 !important; }
 ${
 	s.pageBreakBeforeH1
@@ -215,7 +233,71 @@ function baselineGridMarkup(s: MdToPdfSettings): string {
 	for (let i = 0; i < count; i++) {
 		lines += `<i style="top:${(i * step).toFixed(2)}pt"></i>`;
 	}
-	return `<div class="md2pdf-grid">${lines}</div>`;
+	return `<div class="md2pdf-grid" style="top:${s.marginTopMm}mm">${lines}</div>`;
+}
+
+/**
+ * Moves the first heading so its cap height touches the top margin. When the baseline grid is on,
+ * the baseline goes to the first grid line that keeps the cap line at or below the margin.
+ * Runs in the print window, so it measures the fonts that will actually be printed.
+ */
+function topCapScript(gridPt: number): string {
+	return `<script>
+(function () {
+	var gridPx = ${JSON.stringify(gridPt)} * 4 / 3;
+	function align() {
+		var root = document.querySelector('.md2pdf-root');
+		var h = root && root.firstElementChild;
+		if (!h || !/^H[1-6]$/.test(h.tagName)) return;
+		var cs = getComputedStyle(h);
+		var ctx = document.createElement('canvas').getContext('2d');
+		ctx.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+		var m = ctx.measureText('H');
+		var cap = m.actualBoundingBoxAscent;
+		var lh = parseFloat(cs.lineHeight);
+		var half = (lh - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2;
+		var baselineInBox = half + m.fontBoundingBoxAscent;
+		var baseline = cap;
+		if (gridPx > 0) {
+			baseline = Math.max(1, Math.ceil(cap / gridPx)) * gridPx;
+		}
+		var shift = baseline - baselineInBox;
+		h.style.setProperty('margin-top', shift.toFixed(2) + 'px', 'important');
+	}
+	// Finds where the first line's text baseline sits, using a zero-size inline probe.
+	function baselineOf(el) {
+		var probe = document.createElement('span');
+		probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline;';
+		var target = el;
+		while (target && target.firstChild && target.firstChild.nodeType === 1 &&
+			!/^(P|H[1-6]|UL|OL|LI|BLOCKQUOTE)$/.test(target.firstChild.tagName)) {
+			target = target.firstChild;
+		}
+		if (!target) return null;
+		target.insertBefore(probe, target.firstChild);
+		var y = probe.getBoundingClientRect().bottom + window.scrollY;
+		probe.remove();
+		return y;
+	}
+	function lockBlocks() {
+		if (gridPx <= 0) return;
+		var kids = document.querySelectorAll('.md2pdf-root > *');
+		for (var i = 0; i < kids.length; i++) {
+			var el = kids[i];
+			if (el.tagName === 'HR' || getComputedStyle(el).display === 'none') continue;
+			el.style.removeProperty('padding-top');
+			var base = baselineOf(el);
+			if (base === null) continue;
+			var rem = ((base % gridPx) + gridPx) % gridPx;
+			if (rem > 0.5 && gridPx - rem > 0.5) {
+				var cur = parseFloat(getComputedStyle(el).paddingTop) || 0;
+				el.style.setProperty('padding-top', (cur + gridPx - rem).toFixed(2) + 'px', 'important');
+			}
+		}
+	}
+	document.fonts.ready.then(function () { align(); lockBlocks(); });
+})();
+</script>`;
 }
 
 /** Builds the full print document: the app's CSS first, then print overrides. */
@@ -288,6 +370,7 @@ ${opts.showMargins ? `<style>${marginOverlayCss(s)}</style>` : ""}
 ${opts.showBaselineGrid ? baselineGridMarkup(s) : ""}
 ${opts.showMargins ? '<div class="md2pdf-margins"></div>' : ""}
 <div class="md2pdf-root markdown-rendered">${opts.bodyHtml}</div>
+${topCapScript(s.baselineGridEnabled ? s.baselineGridPt : 0)}
 </body>
 </html>`;
 }

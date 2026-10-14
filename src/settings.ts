@@ -17,6 +17,8 @@ export type PageSize = "A4" | "A5" | "Letter" | "Legal";
 export type Orientation = "portrait" | "landscape";
 export type Alignment = "left" | "center" | "right";
 export type MarginUnit = "mm" | "cm" | "in" | "pt" | "pc";
+/** Line height is a multiplier of the font size (em) or an absolute size (pt). */
+export type LineHeightUnit = "em" | "pt";
 
 /** Millimetres per one unit. */
 export const MM_PER_UNIT: Record<MarginUnit, number> = {
@@ -50,6 +52,7 @@ export interface MdToPdfSettings {
 	bodyItalic: boolean;
 	bodySizePt: number;
 	bodyLineHeight: number;
+	bodyLineHeightUnit: LineHeightUnit;
 	paragraphSpacingEm: number;
 
 	headingFont: string;
@@ -71,6 +74,7 @@ export interface MdToPdfSettings {
 	headingSpaceBeforeEm: number;
 	headingSpaceAfterEm: number;
 	headingLineHeight: number;
+	headingLineHeightUnit: LineHeightUnit;
 	pageBreakBeforeH1: boolean;
 	pageBreakOnHr: boolean;
 
@@ -120,6 +124,7 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	bodyItalic: false,
 	bodySizePt: 11,
 	bodyLineHeight: 1.5,
+	bodyLineHeightUnit: "em",
 	paragraphSpacingEm: 0.8,
 	baselineGridEnabled: false,
 	baselineGridPt: 16.5,
@@ -150,6 +155,7 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	headingSpaceBeforeEm: 1.2,
 	headingSpaceAfterEm: 0.5,
 	headingLineHeight: 1,
+	headingLineHeightUnit: "em",
 	pageBreakBeforeH1: false,
 	pageBreakOnHr: true,
 
@@ -381,7 +387,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.fontSetting(containerEl, "Body font", "bodyFont", s.bodySizePt, { weight: "bodyWeight", italic: "bodyItalic" });
 		this.weightSetting(containerEl, "Body weight", "bodyFont", null, "bodyWeight", "bodyItalic");
 		this.numberSetting(containerEl, "Font size (pt)", "bodySizePt");
-		this.numberSetting(containerEl, "Line height", "bodyLineHeight");
+		this.lineHeightSetting(containerEl, "Line height", "bodyLineHeight", "bodyLineHeightUnit");
 		this.numberSetting(containerEl, "Paragraph spacing (em)", "paragraphSpacingEm");
 
 		new Setting(containerEl).setName("Typography").setHeading();
@@ -399,7 +405,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.fontSetting(containerEl, "Heading font (all levels)", "headingFont", s.h1SizePt);
 		this.numberSetting(containerEl, "Space before headings (em)", "headingSpaceBeforeEm");
 		this.numberSetting(containerEl, "Space after headings (em)", "headingSpaceAfterEm");
-		this.numberSetting(containerEl, "Heading line height", "headingLineHeight");
+		this.lineHeightSetting(containerEl, "Heading line height", "headingLineHeight", "headingLineHeightUnit");
 		this.headingLevel(containerEl, "H1", "h1Font", "h1SizePt", "h1OverrideFont", { weight: "h1Weight", italic: "h1Italic" }, true);
 		this.headingLevel(containerEl, "H2", "h2Font", "h2SizePt", "h2OverrideFont", { weight: "h2Weight", italic: "h2Italic" });
 		this.headingLevel(containerEl, "H3", "h3Font", "h3SizePt", "h3OverrideFont", { weight: "h3Weight", italic: "h3Italic" });
@@ -738,6 +744,36 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings();
 			}),
 		);
+	}
+
+	/** Line height value with a dropdown for its unit (em multiplier or pt). */
+	private lineHeightSetting(
+		el: HTMLElement,
+		name: string,
+		valueKey: "bodyLineHeight" | "headingLineHeight",
+		unitKey: "bodyLineHeightUnit" | "headingLineHeightUnit",
+	) {
+		const s = this.plugin.settings;
+		new Setting(el)
+			.setName(name)
+			.addText((t) =>
+				t.setValue(String(s[valueKey])).onChange(async (v) => {
+					const n = parseFloat(v);
+					if (!Number.isNaN(n) && n > 0) {
+						s[valueKey] = n;
+						await this.plugin.saveSettings();
+					}
+				}),
+			)
+			.addDropdown((d) =>
+				d
+					.addOptions({ em: "em", pt: "pt" })
+					.setValue(s[unitKey])
+					.onChange(async (v) => {
+						s[unitKey] = v as LineHeightUnit;
+						await this.plugin.saveSettings();
+					}),
+			);
 	}
 
 	private numberSetting(el: HTMLElement, name: string, key: NumberKey) {
