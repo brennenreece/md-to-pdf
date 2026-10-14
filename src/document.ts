@@ -502,9 +502,19 @@ export function headerFooterTemplates(
 	const pageHtml = s.pageNumberFormat
 		.replace("{page}", '<span class="pageNumber"></span>')
 		.replace("{pages}", '<span class="totalPages"></span>');
-	const footerTemplate = s.showPageNumbers ? wrapTemplate(pageHtml, s.pageNumberAlign) : "<span></span>";
+	const footerTemplate = s.showPageNumbers ? footerWrap(pageHtml, s) : "<span></span>";
 
 	return { headerTemplate, footerTemplate };
+}
+
+/**
+ * Page-number footer: centered, styled like H3, and vertically centered in the bottom margin.
+ * The box fills the bottom margin, so centering the text puts it halfway between the page edge and the margin.
+ */
+function footerWrap(inner: string, s: MdToPdfSettings): string {
+	const family = s.h3OverrideFont ? resolveFontCss(s.h3Font) : resolveFontCss(s.headingFont);
+	const style = s.h3Italic ? "italic" : "normal";
+	return `<div style="width:100%; height:${s.marginBottomMm}mm; display:flex; align-items:center; justify-content:center; font-family:${escapeHtml(family)}; font-size:${s.h3SizePt}pt; font-weight:${s.h3Weight}; font-style:${style}; color:#000;">${inner}</div>`;
 }
 
 function wrapTemplate(inner: string, align: Alignment): string {
