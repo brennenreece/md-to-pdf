@@ -16,6 +16,8 @@ export class PdfPreviewView extends ItemView {
 	private blobUrl: string | null = null;
 	private timer: number | null = null;
 	private renderSeq = 0;
+	/** Preview-only baseline grid overlay. Kept per view, not saved in settings. */
+	private showGrid = false;
 
 	constructor(leaf: WorkspaceLeaf, plugin: MdToPdfPlugin) {
 		super(leaf);
@@ -43,6 +45,15 @@ export class PdfPreviewView extends ItemView {
 		toolbar.createSpan({ cls: "md2pdf-preview-title", text: this.file?.basename ?? "PDF preview" });
 		const refresh = toolbar.createEl("button", { text: "Refresh" });
 		refresh.addEventListener("click", () => this.requestRender(true));
+
+		const gridLabel = toolbar.createEl("label", { cls: "md2pdf-preview-grid" });
+		const gridToggle = gridLabel.createEl("input", { attr: { type: "checkbox" } });
+		gridToggle.checked = this.showGrid;
+		gridLabel.createSpan({ text: "Baseline grid" });
+		gridToggle.addEventListener("change", () => {
+			this.showGrid = gridToggle.checked;
+			this.requestRender(true);
+		});
 
 		this.statusEl = root.createDiv({ cls: "md2pdf-preview-status" });
 		this.frame = root.createEl("iframe", { cls: "md2pdf-preview-frame" });
@@ -95,7 +106,7 @@ export class PdfPreviewView extends ItemView {
 		const seq = ++this.renderSeq;
 		this.setStatus(`Rendering ${file.basename}…`);
 		try {
-			const html = await this.plugin.buildNoteDocument(file);
+			const html = await this.plugin.buildNoteDocument(file, undefined, { showBaselineGrid: this.showGrid });
 			const pdf = await printHtmlToPdf(html, this.plugin.settings, file.basename);
 			if (seq !== this.renderSeq) return; // a newer render has started
 			this.showPdf(pdf);

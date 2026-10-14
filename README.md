@@ -45,7 +45,7 @@ Use **Save current style as theme** to store the page, margin, font, heading wei
 
 ### PDF preview
 
-Open the **PDF preview** pane from the ribbon icon or the "Open PDF preview" command. It shows the PDF for the active note beside it and re-renders after you edit the note or change settings. Live update and the delay are in the PDF preview settings section. Use **Refresh** to render immediately.
+Open the **PDF preview** pane from the ribbon icon or the "Open PDF preview" command. It shows the PDF for the active note beside it and re-renders after you edit the note or change settings. Live update and the delay are in the PDF preview settings section. Use **Refresh** to render immediately. The **Baseline grid** switch in the preview toolbar draws light blue lines at the baseline grid step, to check text alignment. The grid is preview-only and never appears in exported PDFs.
 
 ### Theme preview
 

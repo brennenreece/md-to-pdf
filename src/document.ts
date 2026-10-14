@@ -165,6 +165,42 @@ ${
 `;
 }
 
+/**
+ * Preview-only grid. Chromium's print path drops CSS gradient backgrounds, so the
+ * lines are explicit absolutely positioned rules, which print reliably.
+ */
+export function baselineOverlayCss(): string {
+	return `
+.md2pdf-grid {
+	position: fixed;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	z-index: 9999;
+}
+.md2pdf-grid i {
+	position: absolute;
+	left: 0;
+	width: 100%;
+	height: 0.5pt;
+	background: rgba(0, 150, 255, 0.35);
+}
+`;
+}
+
+/** Grid line elements, each positioned by an inline top offset. */
+function baselineGridMarkup(s: MdToPdfSettings): string {
+	const step = s.baselineGridPt;
+	const count = Math.min(600, Math.ceil(10000 / step));
+	let lines = "";
+	for (let i = 0; i < count; i++) {
+		lines += `<i style="top:${(i * step).toFixed(2)}pt"></i>`;
+	}
+	return `<div class="md2pdf-grid">${lines}</div>`;
+}
+
 /** Builds the full print document: the app's CSS first, then print overrides. */
 export function buildDocumentHtml(opts: {
 	title: string;
@@ -172,6 +208,8 @@ export function buildDocumentHtml(opts: {
 	appCss: string;
 	fontFaceCss: string;
 	settings: MdToPdfSettings;
+	/** Preview-only: draws the baseline grid over the page. */
+	showBaselineGrid?: boolean;
 }): string {
 	const s = opts.settings;
 	const reset = `
@@ -224,8 +262,10 @@ const hideUiElements = `
 <style>${opts.fontFaceCss}</style>
 <style>${hideUiElements}</style>
 <style>${css}</style>
+${opts.showBaselineGrid ? `<style>${baselineOverlayCss()}</style>` : ""}
 </head>
 <body>
+${opts.showBaselineGrid ? baselineGridMarkup(s) : ""}
 <div class="md2pdf-root markdown-rendered">${opts.bodyHtml}</div>
 </body>
 </html>`;

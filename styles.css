@@ -70,6 +70,14 @@
 	padding: 6px 10px;
 	border-bottom: 1px solid var(--background-modifier-border);
 }
+.md2pdf-preview-grid {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: auto;
+	color: var(--text-muted);
+	white-space: nowrap;
+}
 .md2pdf-preview-title {
 	overflow: hidden;
 	text-overflow: ellipsis;

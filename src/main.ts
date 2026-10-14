@@ -100,7 +100,11 @@ export default class MdToPdfPlugin extends Plugin {
 	}
 
 	/** Builds the full print HTML for a note. Shared by export and the live preview. */
-	async buildNoteDocument(file: TFile, settings: MdToPdfSettings = this.settings): Promise<string> {
+	async buildNoteDocument(
+		file: TFile,
+		settings: MdToPdfSettings = this.settings,
+		opts: { showBaselineGrid?: boolean } = {},
+	): Promise<string> {
 		const raw = await this.app.vault.read(file);
 		const markdown = raw.replace(FRONTMATTER_RE, "");
 		const owner = new Component();
@@ -118,6 +122,7 @@ export default class MdToPdfPlugin extends Plugin {
 				appCss: collectAppCss() + "\n" + (await collectThemeCss(this.app)),
 				fontFaceCss,
 				settings,
+				showBaselineGrid: opts.showBaselineGrid,
 			});
 		} finally {
 			owner.unload();
