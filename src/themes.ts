@@ -23,6 +23,7 @@ export const THEME_KEYS: Array<keyof ThemeData> = [
 	"bodyFont",
 	"bodySizePt",
 	"bodyLineHeight",
+	"headingLineHeight",
 	"paragraphSpacingEm",
 	"baselineGridEnabled",
 	"baselineGridPt",

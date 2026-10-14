@@ -70,6 +70,7 @@ export interface MdToPdfSettings {
 	h3Italic: boolean;
 	headingSpaceBeforeEm: number;
 	headingSpaceAfterEm: number;
+	headingLineHeight: number;
 	pageBreakBeforeH1: boolean;
 	pageBreakOnHr: boolean;
 
@@ -148,6 +149,7 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	h3Italic: false,
 	headingSpaceBeforeEm: 1.2,
 	headingSpaceAfterEm: 0.5,
+	headingLineHeight: 1,
 	pageBreakBeforeH1: false,
 	pageBreakOnHr: true,
 
@@ -204,6 +206,7 @@ type NumberKey =
 	| "h3SizePt"
 	| "headingSpaceBeforeEm"
 	| "headingSpaceAfterEm"
+	| "headingLineHeight"
 	| "codeSizePt";
 type BoolKey = "h1OverrideFont" | "h2OverrideFont" | "h3OverrideFont";
 type BoolTypographyKey =
@@ -396,6 +399,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.fontSetting(containerEl, "Heading font (all levels)", "headingFont", s.h1SizePt);
 		this.numberSetting(containerEl, "Space before headings (em)", "headingSpaceBeforeEm");
 		this.numberSetting(containerEl, "Space after headings (em)", "headingSpaceAfterEm");
+		this.numberSetting(containerEl, "Heading line height", "headingLineHeight");
 		this.headingLevel(containerEl, "H1", "h1Font", "h1SizePt", "h1OverrideFont", { weight: "h1Weight", italic: "h1Italic" }, true);
 		this.headingLevel(containerEl, "H2", "h2Font", "h2SizePt", "h2OverrideFont", { weight: "h2Weight", italic: "h2Italic" });
 		this.headingLevel(containerEl, "H3", "h3Font", "h3SizePt", "h3OverrideFont", { weight: "h3Weight", italic: "h3Italic" });

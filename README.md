@@ -21,6 +21,8 @@ TeX Gyre Chorus is not bundled because the archive only includes its medium ital
 
 Set page margins in mm, cm, inches, points, or picas with the **Margin unit** dropdown. Values are stored in mm, so changing the unit only changes how they are shown.
 
+Heading line height is set under **Headings** (unitless, default 1, like the body line height). Use it to tighten or loosen multi-line headings.
+
 Choose a font from the grouped dropdown. Headings and body text each have their own weight and italic settings. For bundled families, pick the variation with the radio button beside its preview. Previews are drawn at the chosen point size.
 
 ### Typography

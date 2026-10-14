@@ -114,6 +114,7 @@ ${typographyCss(s)}
 	color: #000 !important;
 	margin-top: ${s.headingSpaceBeforeEm}em !important;
 	margin-bottom: ${s.headingSpaceAfterEm}em !important;
+	line-height: ${s.headingLineHeight} !important;
 	break-after: avoid !important;
 	page-break-after: avoid !important;
 }
