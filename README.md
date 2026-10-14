@@ -21,6 +21,8 @@ TeX Gyre Chorus is not bundled because the archive only includes its medium ital
 
 Set page margins in mm, cm, inches, points, or picas with the **Margin unit** dropdown. Values are stored in mm, so changing the unit only changes how they are shown.
 
+Font sizes, the baseline grid unit, and heading and paragraph spacing each have a value and a unit dropdown. Spacing can be given in **em**, **pt**, **pc**, **in**, **cm**, or **mm**. Font sizes and the grid use absolute units. Values are converted to the stored unit when saved, so changing the dropdown does not change the output.
+
 Line height for body text and headings is set with a value and a unit dropdown (**em** multiplies the font size, **pt** is an absolute size). Heading line height defaults to 1 em. Use it to tighten or loosen multi-line headings.
 
 Choose a font from the grouped dropdown. Headings and body text each have their own weight and italic settings. For bundled families, pick the variation with the radio button beside its preview. Previews are drawn at the chosen point size.

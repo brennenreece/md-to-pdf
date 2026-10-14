@@ -11,6 +11,7 @@ import {
 	resolveFontCss,
 } from "./fonts";
 import { contentCss, snappedLineHeightUnits } from "./document";
+import { LENGTH_UNIT_LABELS, LengthUnit, convertLength } from "./length";
 import { applyTheme, snapshotTheme } from "./themes";
 
 export type PageSize = "A4" | "A5" | "Letter" | "Legal";
@@ -54,6 +55,8 @@ export interface MdToPdfSettings {
 	bodyLineHeight: number;
 	bodyLineHeightUnit: LineHeightUnit;
 	paragraphSpacingEm: number;
+	/** Display unit for paragraph spacing. The value is stored in em. */
+	paragraphSpacingUnit: LengthUnit;
 
 	headingFont: string;
 	h1OverrideFont: boolean;
@@ -73,6 +76,9 @@ export interface MdToPdfSettings {
 	h3Italic: boolean;
 	headingSpaceBeforeEm: number;
 	headingSpaceAfterEm: number;
+	/** Display units for heading spacing. Values are stored in em. */
+	headingSpaceBeforeUnit: LengthUnit;
+	headingSpaceAfterUnit: LengthUnit;
 	headingLineHeight: number;
 	headingLineHeightUnit: LineHeightUnit;
 	pageBreakBeforeH1: boolean;
@@ -80,6 +86,13 @@ export interface MdToPdfSettings {
 
 	codeFont: string;
 	codeSizePt: number;
+	/** Display units for font sizes and the grid. Values are stored in pt. */
+	bodySizeUnit: LengthUnit;
+	h1SizeUnit: LengthUnit;
+	h2SizeUnit: LengthUnit;
+	h3SizeUnit: LengthUnit;
+	codeSizeUnit: LengthUnit;
+	baselineGridUnit: LengthUnit;
 
 	showHeader: boolean;
 	headerText: string;
@@ -126,6 +139,7 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	bodyLineHeight: 1.5,
 	bodyLineHeightUnit: "em",
 	paragraphSpacingEm: 0.8,
+	paragraphSpacingUnit: "em",
 	baselineGridEnabled: false,
 	baselineGridPt: 16.5,
 	textWrapPretty: true,
@@ -154,6 +168,8 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	h3Italic: false,
 	headingSpaceBeforeEm: 1.2,
 	headingSpaceAfterEm: 0.5,
+	headingSpaceBeforeUnit: "em",
+	headingSpaceAfterUnit: "em",
 	headingLineHeight: 1,
 	headingLineHeightUnit: "em",
 	pageBreakBeforeH1: false,
@@ -161,6 +177,12 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 
 	codeFont: "Menlo, Consolas, monospace",
 	codeSizePt: 9,
+	bodySizeUnit: "pt",
+	h1SizeUnit: "pt",
+	h2SizeUnit: "pt",
+	h3SizeUnit: "pt",
+	codeSizeUnit: "pt",
+	baselineGridUnit: "pt",
 
 	showHeader: true,
 	headerText: "{{title}}",
@@ -202,6 +224,16 @@ export const FONT_OPTIONS: Record<string, string> = {
 	"'Courier New', Courier, monospace": "Courier New",
 	"'SF Mono', Monaco, monospace": "SF Mono",
 };
+type UnitKey =
+	| "paragraphSpacingUnit"
+	| "headingSpaceBeforeUnit"
+	| "headingSpaceAfterUnit"
+	| "bodySizeUnit"
+	| "h1SizeUnit"
+	| "h2SizeUnit"
+	| "h3SizeUnit"
+	| "codeSizeUnit"
+	| "baselineGridUnit";
 type NumberKey =
 	| "bodySizePt"
 	| "bodyLineHeight"
@@ -223,6 +255,18 @@ type BoolTypographyKey =
 	| "ligatures"
 	| "smallCapsHeadings"
 	| "oldstyleFigures";
+/** Units for fields stored in pt (font sizes, grid). */
+const ABSOLUTE_UNITS: LengthUnit[] = ["pt", "pc", "in", "cm", "mm"];
+/** Units for spacing fields stored in em. Em is listed first as the default. */
+const SPACING_UNITS: LengthUnit[] = ["em", "pt", "pc", "in", "cm", "mm"];
+
+/** Settings key holding the display unit for each size field. */
+const UNIT_KEY_FOR_SIZE: Record<string, UnitKey> = {
+	h1SizePt: "h1SizeUnit",
+	h2SizePt: "h2SizeUnit",
+	h3SizePt: "h3SizeUnit",
+};
+
 type MarginKey = "marginTopMm" | "marginRightMm" | "marginBottomMm" | "marginLeftMm";
 
 type WeightKey = "h1Weight" | "h2Weight" | "h3Weight" | "bodyWeight";
@@ -386,13 +430,13 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName("Body text").setHeading();
 		this.fontSetting(containerEl, "Body font", "bodyFont", s.bodySizePt, { weight: "bodyWeight", italic: "bodyItalic" });
 		this.weightSetting(containerEl, "Body weight", "bodyFont", null, "bodyWeight", "bodyItalic");
-		this.numberSetting(containerEl, "Font size (pt)", "bodySizePt");
+		this.lengthSetting(containerEl, "Font size", "bodySizePt", "bodySizeUnit", ABSOLUTE_UNITS, this.plugin.settings.bodySizePt);
 		this.lineHeightSetting(containerEl, "Line height", "bodyLineHeight", "bodyLineHeightUnit");
-		this.numberSetting(containerEl, "Paragraph spacing (em)", "paragraphSpacingEm");
+		this.lengthSetting(containerEl, "Paragraph spacing", "paragraphSpacingEm", "paragraphSpacingUnit", SPACING_UNITS, this.plugin.settings.bodySizePt);
 
 		new Setting(containerEl).setName("Typography").setHeading();
 		this.boolSetting(containerEl, "Baseline grid", "Snap body and heading spacing to a vertical rhythm.", "baselineGridEnabled");
-		this.numberSetting(containerEl, "Baseline grid unit (pt)", "baselineGridPt");
+		this.lengthSetting(containerEl, "Baseline grid unit", "baselineGridPt", "baselineGridUnit", ABSOLUTE_UNITS, this.plugin.settings.bodySizePt);
 		this.boolSetting(containerEl, "Text wrap (avoid orphans)", "Balance last lines to avoid single words.", "textWrapPretty");
 		this.boolSetting(containerEl, "Justify text", "Align body text to both margins.", "justify");
 		this.boolSetting(containerEl, "Hyphenation", "Break long words at line ends. Needs a language.", "hyphenation");
@@ -403,8 +447,8 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl).setName("Headings").setHeading();
 		this.fontSetting(containerEl, "Heading font (all levels)", "headingFont", s.h1SizePt);
-		this.numberSetting(containerEl, "Space before headings (em)", "headingSpaceBeforeEm");
-		this.numberSetting(containerEl, "Space after headings (em)", "headingSpaceAfterEm");
+		this.lengthSetting(containerEl, "Space before headings", "headingSpaceBeforeEm", "headingSpaceBeforeUnit", SPACING_UNITS, this.plugin.settings.bodySizePt);
+		this.lengthSetting(containerEl, "Space after headings", "headingSpaceAfterEm", "headingSpaceAfterUnit", SPACING_UNITS, this.plugin.settings.bodySizePt);
 		this.lineHeightSetting(containerEl, "Heading line height", "headingLineHeight", "headingLineHeightUnit");
 		this.headingLevel(containerEl, "H1", "h1Font", "h1SizePt", "h1OverrideFont", { weight: "h1Weight", italic: "h1Italic" }, true);
 		this.headingLevel(containerEl, "H2", "h2Font", "h2SizePt", "h2OverrideFont", { weight: "h2Weight", italic: "h2Italic" });
@@ -420,7 +464,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl).setName("Code").setHeading();
 		this.fontSetting(containerEl, "Code font", "codeFont", s.codeSizePt);
-		this.numberSetting(containerEl, "Code size (pt)", "codeSizePt");
+		this.lengthSetting(containerEl, "Code size", "codeSizePt", "codeSizeUnit", ABSOLUTE_UNITS, this.plugin.settings.bodySizePt);
 
 		new Setting(containerEl).setName("Header and footer").setHeading();
 		new Setting(containerEl).setName("Show header").addToggle((t) =>
@@ -672,15 +716,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			this.fontPreview(el, this.plugin.settings.headingFont, this.plugin.settings[sizeKey], faceKeys);
 		}
 		this.weightSetting(el, `${level} weight`, fontKey, overrideKey, faceKeys.weight, faceKeys.italic);
-		const row = new Setting(el).setName(`${level} size (pt)`).addText((t) =>
-			t.setValue(String(this.plugin.settings[sizeKey])).onChange(async (v) => {
-				const n = parseFloat(v);
-				if (!Number.isNaN(n) && n > 0) {
-					this.plugin.settings[sizeKey] = n;
-					await this.plugin.saveSettings();
-				}
-			}),
-		);
+		const row = this.lengthSetting(el, `${level} size`, sizeKey, UNIT_KEY_FOR_SIZE[sizeKey], ABSOLUTE_UNITS, this.plugin.settings[sizeKey]);
 		if (withPageBreak) {
 			row.addToggle((t) =>
 				t
@@ -790,15 +826,45 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		refreshHint();
 	}
 
-	private numberSetting(el: HTMLElement, name: string, key: NumberKey) {
-		new Setting(el).setName(name).addText((t) =>
-			t.setValue(String(this.plugin.settings[key])).onChange(async (v) => {
-				const n = parseFloat(v);
-				if (!Number.isNaN(n) && n > 0) {
-					this.plugin.settings[key] = n;
+	/**
+	 * A length field with a unit dropdown. The value is stored in its canonical unit (pt or em)
+	 * and shown in the selected unit. Converting an em value to an absolute unit needs the font
+	 * size it multiplies, passed as `basePt`.
+	 */
+	private lengthSetting(
+		el: HTMLElement,
+		name: string,
+		key: NumberKey,
+		unitKey: UnitKey,
+		units: LengthUnit[],
+		basePt: number,
+	): Setting {
+		const s = this.plugin.settings;
+		const canonical: LengthUnit = units.includes("em") ? "em" : "pt";
+		const setting = new Setting(el).setName(name);
+		const show = () => {
+			const unit = s[unitKey];
+			const v = convertLength(s[key], canonical, unit, basePt);
+			return String(Math.round(v * 1000) / 1000);
+		};
+		setting
+			.addText((t) =>
+				t.setValue(show()).onChange(async (v) => {
+					const n = parseFloat(v);
+					if (!Number.isNaN(n) && n > 0) {
+						s[key] = convertLength(n, s[unitKey], canonical, basePt);
+						await this.plugin.saveSettings();
+					}
+				}),
+			)
+			.addDropdown((d) => {
+				for (const unit of units) d.addOption(unit, LENGTH_UNIT_LABELS[unit]);
+				d.setValue(s[unitKey]).onChange(async (v) => {
+					s[unitKey] = v as LengthUnit;
 					await this.plugin.saveSettings();
-				}
-			}),
-		);
+					this.refresh();
+				});
+			});
+		return setting;
 	}
 }
