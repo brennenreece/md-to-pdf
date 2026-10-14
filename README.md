@@ -25,6 +25,10 @@ Choose a font from the grouped dropdown. Headings and body text each have their 
 
 Use **Save current style as theme** to store the page, margin, font, heading weight and italic, code, and header/footer settings under a name. Load, delete, or reset from the Themes section. Themes are stored in the plugin's data file.
 
+### PDF preview
+
+Open the **PDF preview** pane from the ribbon icon or the "Open PDF preview" command. It shows the PDF for the active note beside it and re-renders after you edit the note or change settings. Live update and the delay are in the PDF preview settings section. Use **Refresh** to render immediately.
+
 ### Theme preview
 
 The settings page has a **Theme preview** tab. It shows Lorem Ipsum sample text for every heading level and common text styles. It uses the same CSS as export, so it updates as you change settings.

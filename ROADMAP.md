@@ -34,10 +34,10 @@ Goal: export Obsidian notes to PDFs that match the reading preview exactly, incl
 
 ## Next
 
-### 1. Preview pane
-- Custom `ItemView` that shows the paginated PDF output beside the note.
-- Debounced auto-refresh, plus a manual refresh command.
-- Show page breaks.
+### 1. Preview pane (implemented, needs verification in Obsidian)
+- Custom `ItemView` that shows the paginated PDF output beside the note. Open it from the ribbon or the "Open PDF preview" command.
+- Debounced auto-refresh (default 1000 ms, adjustable) with a live update toggle, plus a manual Refresh button and command.
+- Still to do: show page breaks.
 
 ### 2. Table of contents
 - Generated from headings, with a configurable depth range.

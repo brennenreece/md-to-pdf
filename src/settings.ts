@@ -63,6 +63,11 @@ export interface MdToPdfSettings {
 	showPageNumbers: boolean;
 	pageNumberFormat: string;
 	pageNumberAlign: Alignment;
+
+	/** Re-render the preview pane when the note or settings change. Not part of themes. */
+	livePreview: boolean;
+	/** Delay after the last change before the preview re-renders. Not part of themes. */
+	livePreviewDelayMs: number;
 }
 
 export const DEFAULT_SETTINGS: MdToPdfSettings = {
@@ -111,6 +116,8 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	showPageNumbers: true,
 	pageNumberFormat: "Page {page} of {pages}",
 	pageNumberAlign: "right",
+	livePreview: true,
+	livePreviewDelayMs: 1000,
 };
 
 type TextKey =
@@ -343,6 +350,23 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			}),
 		);
 		this.textSetting(containerEl, "Page number format ({page}, {pages})", "pageNumberFormat");
+
+		new Setting(containerEl).setName("PDF preview").setHeading();
+		new Setting(containerEl).setName("Live update").setDesc("Re-render the preview pane when the note or settings change.").addToggle((t) =>
+			t.setValue(s.livePreview).onChange(async (v) => {
+				s.livePreview = v;
+				await save();
+			}),
+		);
+		new Setting(containerEl).setName("Update delay (ms)").setDesc("Wait this long after the last change before re-rendering.").addText((t) =>
+			t.setValue(String(s.livePreviewDelayMs)).onChange(async (v) => {
+				const n = parseInt(v, 10);
+				if (!Number.isNaN(n) && n >= 0) {
+					s.livePreviewDelayMs = n;
+					await save();
+				}
+			}),
+		);
 
 		new Setting(containerEl).setName("Themes").setHeading();
 		this.themeSettings(containerEl);
