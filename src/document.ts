@@ -8,6 +8,20 @@ const PAGE_MM: Record<string, [number, number]> = {
 	Legal: [215.9, 355.6],
 };
 
+/** Height of the text area on one printed page, in CSS px (96 per inch). */
+function printableHeightPx(s: MdToPdfSettings): number {
+	const [w, h] = PAGE_MM[s.pageSize];
+	const pageMm = s.orientation === "landscape" ? w : h;
+	return ((pageMm - s.marginTopMm - s.marginBottomMm) * 96) / 25.4;
+}
+
+/** Width of the text column on a printed page, in CSS px (96 per inch). */
+function printableWidthPx(s: MdToPdfSettings): number {
+	const [w, h] = PAGE_MM[s.pageSize];
+	const pageMm = s.orientation === "landscape" ? h : w;
+	return ((pageMm - s.marginLeftMm - s.marginRightMm) * 96) / 25.4;
+}
+
 export function pageSizeCss(s: MdToPdfSettings): string {
 	const [w, h] = PAGE_MM[s.pageSize];
 	return s.orientation === "landscape" ? `${h}mm ${w}mm` : `${w}mm ${h}mm`;
@@ -48,6 +62,21 @@ export function snappedLineHeightUnits(
  * Typography rules: line breaking, hyphenation, justification, OpenType features, and an
  * optional baseline grid. Kept separate so the grid rules can be read on their own.
  */
+/**
+ * Margin rules for each heading level. H1 to H3 use their own values. H4 to H6 share the
+ * general heading values. `toCss` turns an em value into a CSS length.
+ */
+function headingSpaceRules(s: MdToPdfSettings, toCss: (em: number) => string): string {
+	const levelRule = (sel: string, before: number, after: number) =>
+		`${sel} { margin-top: ${toCss(before)} !important; margin-bottom: ${toCss(after)} !important; }`;
+	return [
+		levelRule(".md2pdf-root h1", s.h1SpaceBeforeEm, s.h1SpaceAfterEm),
+		levelRule(".md2pdf-root h2", s.h2SpaceBeforeEm, s.h2SpaceAfterEm),
+		levelRule(".md2pdf-root h3", s.h3SpaceBeforeEm, s.h3SpaceAfterEm),
+		levelRule(".md2pdf-root h4, .md2pdf-root h5, .md2pdf-root h6", s.headingSpaceBeforeEm, s.headingSpaceAfterEm),
+	].join("\n");
+}
+
 export function typographyCss(s: MdToPdfSettings): string {
 	// Ligature and figure choices go through font-feature-settings so one rule owns them.
 	const features: string[] = [];
@@ -74,15 +103,7 @@ export function typographyCss(s: MdToPdfSettings): string {
 .md2pdf-root pre {
 	margin-bottom: calc(var(--md2pdf-baseline) * ${halfUnits(s.paragraphSpacingEm)}) !important;
 }
-.md2pdf-root h1,
-.md2pdf-root h2,
-.md2pdf-root h3,
-.md2pdf-root h4,
-.md2pdf-root h5,
-.md2pdf-root h6 {
-	margin-top: calc(var(--md2pdf-baseline) * ${halfUnits(s.headingSpaceBeforeEm)}) !important;
-	margin-bottom: calc(var(--md2pdf-baseline) * ${halfUnits(s.headingSpaceAfterEm)}) !important;
-}`
+${headingSpaceRules(s, (em) => `calc(var(--md2pdf-baseline) * ${halfUnits(em)})`)}`
 		: "";
 
 	return `.md2pdf-root {
@@ -145,14 +166,13 @@ ${typographyCss(s)}
 .md2pdf-root h5,
 .md2pdf-root h6 {
 	color: #000 !important;
-	margin-top: ${s.headingSpaceBeforeEm}em !important;
-	margin-bottom: ${s.headingSpaceAfterEm}em !important;
 	break-after: avoid !important;
 	page-break-after: avoid !important;
 }
 .md2pdf-root h1 { line-height: ${lineHeightValue(s.headingLineHeight, s.headingLineHeightUnit, s.h1SizePt, s)} !important; font-family: ${s.h1OverrideFont ? resolveFontCss(s.h1Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h1SizePt}pt !important; font-weight: ${s.h1Weight} !important; font-style: ${s.h1Italic ? "italic" : "normal"} !important; }
 .md2pdf-root h2 { line-height: ${lineHeightValue(s.headingLineHeight, s.headingLineHeightUnit, s.h2SizePt, s)} !important; font-family: ${s.h2OverrideFont ? resolveFontCss(s.h2Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h2SizePt}pt !important; font-weight: ${s.h2Weight} !important; font-style: ${s.h2Italic ? "italic" : "normal"} !important; }
 .md2pdf-root h3 { line-height: ${lineHeightValue(s.headingLineHeight, s.headingLineHeightUnit, s.h3SizePt, s)} !important; font-family: ${s.h3OverrideFont ? resolveFontCss(s.h3Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h3SizePt}pt !important; font-weight: ${s.h3Weight} !important; font-style: ${s.h3Italic ? "italic" : "normal"} !important; }
+${headingSpaceRules(s, (em) => `${em}em`)}
 .md2pdf-root h1:first-child { margin-top: 0 !important; }
 ${
 	s.pageBreakBeforeH1
@@ -258,12 +278,20 @@ function baselineGridMarkup(s: MdToPdfSettings): string {
  * measured from the page start, so their baselines land on the grid too.
  * Runs in the print window, after the fonts it will print have loaded.
  */
-function topCapScript(gridPt: number, breakOnH1: boolean, breakOnHr: boolean): string {
+function topCapScript(
+	gridPt: number,
+	breakOnH1: boolean,
+	breakOnHr: boolean,
+	pageHeightPx: number,
+	pageWidthPx: number,
+): string {
 	return `<script>
 (function () {
 	var gridPx = ${JSON.stringify(gridPt)} * 4 / 3;
 	var breakOnH1 = ${JSON.stringify(breakOnH1)};
 	var breakOnHr = ${JSON.stringify(breakOnHr)};
+	var pageHeightPx = ${JSON.stringify(pageHeightPx)};
+	var pageWidthPx = ${JSON.stringify(pageWidthPx)};
 	function measureFont(el) {
 		var cs = getComputedStyle(el);
 		var ctx = document.createElement('canvas').getContext('2d');
@@ -283,12 +311,50 @@ function topCapScript(gridPt: number, breakOnH1: boolean, breakOnHr: boolean): s
 		probe.remove();
 		return y;
 	}
+	// Returns the first text position in the block whose line bottom passes the page bottom, or null.
+	function firstOverflowPoint(el, root, pageTop) {
+		var rootTop = root.getBoundingClientRect().top;
+		var limit = pageTop + pageHeightPx;
+		var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+		var node;
+		while ((node = walker.nextNode())) {
+			var text = node.nodeValue;
+			for (var j = 1; j < text.length; j++) {
+				if (/\s/.test(text.charAt(j)) || /\s/.test(text.charAt(j - 1))) continue;
+				var r = document.createRange();
+				r.setStart(node, j);
+				r.setEnd(node, j + 1);
+				var rects = r.getClientRects();
+				if (rects.length && rects[0].bottom - rootTop > limit) return { node: node, offset: j };
+			}
+		}
+		return null;
+	}
+	// Splits a paragraph that runs past the page bottom. The remainder is inserted after it and returned.
+	function splitOverflow(el, root, pageTop) {
+		if (el.tagName !== 'P' || !(pageHeightPx > 0)) return null;
+		var found = firstOverflowPoint(el, root, pageTop);
+		if (!found) return null;
+		var tail = document.createRange();
+		tail.setStart(found.node, found.offset);
+		tail.setEnd(el, el.childNodes.length);
+		var frag = tail.extractContents();
+		var rest = el.cloneNode(false);
+		rest.removeAttribute('id');
+		rest.appendChild(frag);
+		el.parentNode.insertBefore(rest, el.nextSibling);
+		return rest;
+	}
 	function layoutPages() {
 		var root = document.querySelector('.md2pdf-root');
 		if (!root) return;
+		// Lay out in the print column so line breaks match the printed page.
+		var savedWidth = root.style.width;
+		if (pageWidthPx > 0) root.style.setProperty('width', pageWidthPx + 'px', 'important');
 		var kids = Array.prototype.slice.call(root.children);
 		var pageTop = 0;
 		var prevVisible = null;
+		var forcedStart = null;
 		for (var i = 0; i < kids.length; i++) {
 			var el = kids[i];
 			if (el.tagName === 'HR' || getComputedStyle(el).display === 'none') {
@@ -296,9 +362,17 @@ function topCapScript(gridPt: number, breakOnH1: boolean, breakOnHr: boolean): s
 				continue;
 			}
 			var isStart = i === 0
+				|| el === forcedStart
 				|| (breakOnH1 && el.tagName === 'H1')
 				|| (breakOnHr && prevVisible !== null && prevVisible.tagName === 'HR');
 			prevVisible = null;
+			if (!isStart && pageHeightPx > 0) {
+				// A block whose first line falls past the bottom of the page moves to the next page,
+				// as if it had a forced break. Its first line must not start below the page's text area.
+				var firstLineY = baselineOf(el, root) - pageTop;
+				var lineBottom = firstLineY + (parseFloat(getComputedStyle(el).lineHeight) || 0);
+				if (lineBottom > pageHeightPx) isStart = true;
+			}
 			if (isStart) {
 				// Measure from the block's own top edge, with no margin or padding, to find the baseline offset.
 				el.style.setProperty('margin-top', '0px', 'important');
@@ -310,8 +384,14 @@ function topCapScript(gridPt: number, breakOnH1: boolean, breakOnHr: boolean): s
 				var delta = target - rel;
 				el.style.setProperty('margin-top', delta.toFixed(2) + 'px', 'important');
 				pageTop = el.getBoundingClientRect().top - root.getBoundingClientRect().top - delta;
-				continue;
 			}
+			// A paragraph that runs past the bottom continues on the next page as if it had a forced break.
+			var rest = splitOverflow(el, root, pageTop);
+			if (rest) {
+				kids.splice(i + 1, 0, rest);
+				forcedStart = rest;
+			}
+			if (isStart) continue;
 			if (gridPx > 0) {
 				var rel2 = baselineOf(el, root) - pageTop;
 				var target2 = Math.ceil(rel2 / gridPx - 1e-6) * gridPx;
@@ -322,6 +402,7 @@ function topCapScript(gridPt: number, breakOnH1: boolean, breakOnHr: boolean): s
 				}
 			}
 		}
+		root.style.width = savedWidth;
 	}
 	document.fonts.ready.then(layoutPages);
 })();
@@ -398,7 +479,7 @@ ${opts.showMargins ? `<style>${marginOverlayCss(s)}</style>` : ""}
 ${opts.showBaselineGrid ? baselineGridMarkup(s) : ""}
 ${opts.showMargins ? '<div class="md2pdf-margins"></div>' : ""}
 <div class="md2pdf-root markdown-rendered">${opts.bodyHtml}</div>
-${topCapScript(s.baselineGridEnabled ? s.baselineGridPt : 0, s.pageBreakBeforeH1, s.pageBreakOnHr)}
+${topCapScript(s.baselineGridEnabled ? s.baselineGridPt : 0, s.pageBreakBeforeH1, s.pageBreakOnHr, printableHeightPx(s), printableWidthPx(s))}
 </body>
 </html>`;
 }

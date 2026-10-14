@@ -21,7 +21,7 @@ TeX Gyre Chorus is not bundled because the archive only includes its medium ital
 
 Set page margins in mm, cm, inches, points, or picas with the **Margin unit** dropdown. Values are stored in mm, so changing the unit only changes how they are shown.
 
-Font sizes, the baseline grid unit, and heading and paragraph spacing each have a value and a unit dropdown. Spacing can be given in **em**, **pt**, **pc**, **in**, **cm**, or **mm**. Font sizes and the grid use absolute units. Values are converted to the stored unit when saved, so changing the dropdown does not change the output.
+Font sizes, the baseline grid unit, and paragraph spacing each have a value and a unit dropdown. H1, H2, and H3 each have their own space before and space after, and H4–H6 share one pair. Each heading level's spacing has its own value and unit dropdown. Spacing can be given in **em**, **pt**, **pc**, **in**, **cm**, or **mm**. Font sizes and the grid use absolute units. Values are converted to the stored unit when saved, so changing the dropdown does not change the output.
 
 Line height for body text and headings is set with a value and a unit dropdown (**em** multiplies the font size, **pt** is an absolute size). Heading line height defaults to 1 em. Use it to tighten or loosen multi-line headings.
 
@@ -37,7 +37,9 @@ The **Typography** section in settings controls:
 - **Ligatures**. On by default. Turning them off disables `liga`, `clig`, and `dlig`.
 - **Oldstyle figures** (`onum`), if the font supports them.
 - **Small caps headings** (headings are set in small caps, with balanced line breaks).
-- **Baseline grid**. When enabled, body and heading line heights are whole multiples of the grid unit (in pt), block spacing snaps to half units, and each block's first baseline is moved onto a grid line. The first line of every page (including pages that start after a page break or `---` rule) has its cap height on the top margin, or on the first grid line below it when the grid is on.
+- **Baseline grid**. When enabled, body and heading line heights are whole multiples of the grid unit (in pt), block spacing snaps to half units, and each block's first baseline is moved onto a grid line. The first line of every page (including pages that start after a page break or `---` rule) has its cap height on the top margin, or on the first grid line below it when the grid is on. Layout is measured in the printed column width, so line breaks match the PDF.
+- **Overflow page breaks**. A block whose first line would fall past the bottom margin moves to the next page, as if it had a forced break.
+- **Known gap**: a paragraph split across pages does not yet align its continuation line to the top margin. The continuation starts a few points below the margin. Whole blocks that move to a new page are aligned correctly.
 
 Hyphenation and justification are applied by Chromium's print engine, so they show in exported PDFs.
 

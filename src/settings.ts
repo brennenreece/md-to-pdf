@@ -74,6 +74,19 @@ export interface MdToPdfSettings {
 	h1Italic: boolean;
 	h2Italic: boolean;
 	h3Italic: boolean;
+	h1SpaceBeforeEm: number;
+	h1SpaceAfterEm: number;
+	h1SpaceBeforeUnit: LengthUnit;
+	h1SpaceAfterUnit: LengthUnit;
+	h2SpaceBeforeEm: number;
+	h2SpaceAfterEm: number;
+	h2SpaceBeforeUnit: LengthUnit;
+	h2SpaceAfterUnit: LengthUnit;
+	h3SpaceBeforeEm: number;
+	h3SpaceAfterEm: number;
+	h3SpaceBeforeUnit: LengthUnit;
+	h3SpaceAfterUnit: LengthUnit;
+	/** Space before and after H4 to H6. */
 	headingSpaceBeforeEm: number;
 	headingSpaceAfterEm: number;
 	/** Display units for heading spacing. Values are stored in em. */
@@ -166,6 +179,18 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	h1Italic: false,
 	h2Italic: false,
 	h3Italic: false,
+	h1SpaceBeforeEm: 1.2,
+	h1SpaceAfterEm: 0.5,
+	h1SpaceBeforeUnit: "em",
+	h1SpaceAfterUnit: "em",
+	h2SpaceBeforeEm: 1.2,
+	h2SpaceAfterEm: 0.5,
+	h2SpaceBeforeUnit: "em",
+	h2SpaceAfterUnit: "em",
+	h3SpaceBeforeEm: 1.2,
+	h3SpaceAfterEm: 0.5,
+	h3SpaceBeforeUnit: "em",
+	h3SpaceAfterUnit: "em",
 	headingSpaceBeforeEm: 1.2,
 	headingSpaceAfterEm: 0.5,
 	headingSpaceBeforeUnit: "em",
@@ -225,6 +250,12 @@ export const FONT_OPTIONS: Record<string, string> = {
 	"'SF Mono', Monaco, monospace": "SF Mono",
 };
 type UnitKey =
+	| "h1SpaceBeforeUnit"
+	| "h1SpaceAfterUnit"
+	| "h2SpaceBeforeUnit"
+	| "h2SpaceAfterUnit"
+	| "h3SpaceBeforeUnit"
+	| "h3SpaceAfterUnit"
 	| "paragraphSpacingUnit"
 	| "headingSpaceBeforeUnit"
 	| "headingSpaceAfterUnit"
@@ -235,6 +266,12 @@ type UnitKey =
 	| "codeSizeUnit"
 	| "baselineGridUnit";
 type NumberKey =
+	| "h1SpaceBeforeEm"
+	| "h1SpaceAfterEm"
+	| "h2SpaceBeforeEm"
+	| "h2SpaceAfterEm"
+	| "h3SpaceBeforeEm"
+	| "h3SpaceAfterEm"
 	| "bodySizePt"
 	| "bodyLineHeight"
 	| "paragraphSpacingEm"
@@ -447,12 +484,15 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl).setName("Headings").setHeading();
 		this.fontSetting(containerEl, "Heading font (all levels)", "headingFont", s.h1SizePt);
-		this.lengthSetting(containerEl, "Space before headings", "headingSpaceBeforeEm", "headingSpaceBeforeUnit", SPACING_UNITS, this.plugin.settings.bodySizePt);
-		this.lengthSetting(containerEl, "Space after headings", "headingSpaceAfterEm", "headingSpaceAfterUnit", SPACING_UNITS, this.plugin.settings.bodySizePt);
+		this.lengthSetting(containerEl, "H4–H6 space before", "headingSpaceBeforeEm", "headingSpaceBeforeUnit", SPACING_UNITS, s.bodySizePt);
+		this.lengthSetting(containerEl, "H4–H6 space after", "headingSpaceAfterEm", "headingSpaceAfterUnit", SPACING_UNITS, s.bodySizePt);
 		this.lineHeightSetting(containerEl, "Heading line height", "headingLineHeight", "headingLineHeightUnit");
 		this.headingLevel(containerEl, "H1", "h1Font", "h1SizePt", "h1OverrideFont", { weight: "h1Weight", italic: "h1Italic" }, true);
+		this.headingSpacing(containerEl, "H1", "h1");
 		this.headingLevel(containerEl, "H2", "h2Font", "h2SizePt", "h2OverrideFont", { weight: "h2Weight", italic: "h2Italic" });
+		this.headingSpacing(containerEl, "H2", "h2");
 		this.headingLevel(containerEl, "H3", "h3Font", "h3SizePt", "h3OverrideFont", { weight: "h3Weight", italic: "h3Italic" });
+		this.headingSpacing(containerEl, "H3", "h3");
 
 		new Setting(containerEl).setName("Page breaks").setHeading();
 		new Setting(containerEl).setName("Page break at horizontal rule (---)").addToggle((t) =>
@@ -694,6 +734,13 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 	 * One heading level: an own-font switch, the level's font (when the switch is on), weight, italic,
 	 * and size. H1 also gets the new-page toggle on its size row.
 	 */
+	/** Space before and after one heading level. */
+	private headingSpacing(el: HTMLElement, level: string, prefix: "h1" | "h2" | "h3") {
+		const base = this.plugin.settings.bodySizePt;
+		this.lengthSetting(el, `${level} space before`, `${prefix}SpaceBeforeEm` as NumberKey, `${prefix}SpaceBeforeUnit` as UnitKey, SPACING_UNITS, base);
+		this.lengthSetting(el, `${level} space after`, `${prefix}SpaceAfterEm` as NumberKey, `${prefix}SpaceAfterUnit` as UnitKey, SPACING_UNITS, base);
+	}
+
 	private headingLevel(
 		el: HTMLElement,
 		level: string,
