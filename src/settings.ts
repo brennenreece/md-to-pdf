@@ -84,6 +84,21 @@ export interface MdToPdfSettings {
 	pageNumberFormat: string;
 	pageNumberAlign: Alignment;
 
+	/** Snap body text and heading spacing to a vertical baseline grid. */
+	baselineGridEnabled: boolean;
+	/** Baseline grid unit in pt. Usually body size x line height. */
+	baselineGridPt: number;
+	/** Avoid single words alone on the last line of a paragraph (text-wrap: pretty). */
+	textWrapPretty: boolean;
+	/** Hyphenate words at line ends using the browser's dictionary. */
+	hyphenation: boolean;
+	/** Language for hyphenation and line-breaking (BCP 47 tag, e.g. en-US). */
+	hyphenLang: string;
+	justify: boolean;
+	ligatures: boolean;
+	smallCapsHeadings: boolean;
+	oldstyleFigures: boolean;
+
 	/** Re-render the preview pane when the note or settings change. Not part of themes. */
 	livePreview: boolean;
 	/** Delay after the last change before the preview re-renders. Not part of themes. */
@@ -105,6 +120,15 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	bodySizePt: 11,
 	bodyLineHeight: 1.5,
 	paragraphSpacingEm: 0.8,
+	baselineGridEnabled: false,
+	baselineGridPt: 16.5,
+	textWrapPretty: true,
+	hyphenation: false,
+	hyphenLang: "en-US",
+	justify: false,
+	ligatures: true,
+	smallCapsHeadings: false,
+	oldstyleFigures: false,
 
 	headingFont: "Helvetica, Arial, sans-serif",
 	h1OverrideFont: false,
@@ -149,6 +173,7 @@ type TextKey =
 	| "h3Font"
 	| "codeFont"
 	| "headerText"
+	| "hyphenLang"
 	| "pageNumberFormat";
 
 /** Fonts offered in the dropdowns. Each value is a CSS font-family stack. */
@@ -173,6 +198,7 @@ type NumberKey =
 	| "bodySizePt"
 	| "bodyLineHeight"
 	| "paragraphSpacingEm"
+	| "baselineGridPt"
 	| "h1SizePt"
 	| "h2SizePt"
 	| "h3SizePt"
@@ -180,6 +206,14 @@ type NumberKey =
 	| "headingSpaceAfterEm"
 	| "codeSizePt";
 type BoolKey = "h1OverrideFont" | "h2OverrideFont" | "h3OverrideFont";
+type BoolTypographyKey =
+	| "baselineGridEnabled"
+	| "textWrapPretty"
+	| "justify"
+	| "hyphenation"
+	| "ligatures"
+	| "smallCapsHeadings"
+	| "oldstyleFigures";
 type MarginKey = "marginTopMm" | "marginRightMm" | "marginBottomMm" | "marginLeftMm";
 
 type WeightKey = "h1Weight" | "h2Weight" | "h3Weight" | "bodyWeight";
@@ -212,6 +246,7 @@ const THEME_PREVIEW_HTML = `
 <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.</p>
 <h5>Neque Porro Quisquam</h5>
 <p>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet.</p>
+<p>Extraordinarily unbelievable interdisciplinary professionalization continues to be notoriously difficult to typeset without considerable forethought and careful measurement across many repeated paragraphs of running text.</p>
 <h6>Quis Autem Vel Eum</h6>
 <p>Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae.</p>
 <p><em>Italic text</em>, <strong>bold text</strong>, and <code>inline code</code> sit beside each other.</p>
@@ -345,6 +380,17 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.numberSetting(containerEl, "Font size (pt)", "bodySizePt");
 		this.numberSetting(containerEl, "Line height", "bodyLineHeight");
 		this.numberSetting(containerEl, "Paragraph spacing (em)", "paragraphSpacingEm");
+
+		new Setting(containerEl).setName("Typography").setHeading();
+		this.boolSetting(containerEl, "Baseline grid", "Snap body and heading spacing to a vertical rhythm.", "baselineGridEnabled");
+		this.numberSetting(containerEl, "Baseline grid unit (pt)", "baselineGridPt");
+		this.boolSetting(containerEl, "Text wrap (avoid orphans)", "Balance last lines to avoid single words.", "textWrapPretty");
+		this.boolSetting(containerEl, "Justify text", "Align body text to both margins.", "justify");
+		this.boolSetting(containerEl, "Hyphenation", "Break long words at line ends. Needs a language.", "hyphenation");
+		this.textSetting(containerEl, "Hyphenation language", "hyphenLang");
+		this.boolSetting(containerEl, "Ligatures", "Use fi, fl, and similar joined letterforms.", "ligatures");
+		this.boolSetting(containerEl, "Small caps headings", "Set headings in small capitals.", "smallCapsHeadings");
+		this.boolSetting(containerEl, "Oldstyle figures", "Use figures that sit within the x-height.", "oldstyleFigures");
 
 		new Setting(containerEl).setName("Headings").setHeading();
 		this.fontSetting(containerEl, "Heading font (all levels)", "headingFont", s.h1SizePt);
@@ -674,6 +720,15 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 
 	private textSetting(el: HTMLElement, name: string, key: TextKey) {
 		new Setting(el).setName(name).addText((t) =>
+			t.setValue(this.plugin.settings[key]).onChange(async (v) => {
+				this.plugin.settings[key] = v;
+				await this.plugin.saveSettings();
+			}),
+		);
+	}
+
+	private boolSetting(el: HTMLElement, name: string, desc: string, key: BoolTypographyKey) {
+		new Setting(el).setName(name).setDesc(desc).addToggle((t) =>
 			t.setValue(this.plugin.settings[key]).onChange(async (v) => {
 				this.plugin.settings[key] = v;
 				await this.plugin.saveSettings();

@@ -13,6 +13,72 @@ export function pageSizeCss(s: MdToPdfSettings): string {
 	return s.orientation === "landscape" ? `${h}mm ${w}mm` : `${w}mm ${h}mm`;
 }
 
+/**
+ * Typography rules: line breaking, hyphenation, justification, OpenType features, and an
+ * optional baseline grid. Kept separate so the grid rules can be read on their own.
+ */
+export function typographyCss(s: MdToPdfSettings): string {
+	// Ligature and figure choices go through font-feature-settings so one rule owns them.
+	const features: string[] = [];
+	if (!s.ligatures) features.push('"liga" 0', '"clig" 0', '"dlig" 0');
+	if (s.oldstyleFigures) features.push('"onum" 1');
+	const featureRule = features.length ? `font-feature-settings: ${features.join(", ")} !important;` : "";
+	const capsRule = s.smallCapsHeadings ? "font-variant-caps: all-small-caps !important;" : "";
+	const hyphenRule = s.hyphenation
+		? "hyphens: auto !important;\n\t-webkit-hyphens: auto !important;"
+		: "";
+	const alignRule = s.justify ? "text-align: justify !important;" : "";
+
+	// Spacing snaps to whole or half baseline units. Half units keep headings close to their
+	// requested em spacing while still landing on the grid.
+	const halfUnits = (em: number) => Math.max(0, Math.round(em * 2)) / 2;
+	const gridVar = s.baselineGridEnabled ? `--md2pdf-baseline: ${s.baselineGridPt}pt;` : "";
+	const gridRules = s.baselineGridEnabled
+		? `
+.md2pdf-root p,
+.md2pdf-root ul,
+.md2pdf-root ol,
+.md2pdf-root blockquote,
+.md2pdf-root table,
+.md2pdf-root pre {
+	margin-bottom: calc(var(--md2pdf-baseline) * ${halfUnits(s.paragraphSpacingEm)}) !important;
+}
+.md2pdf-root h1,
+.md2pdf-root h2,
+.md2pdf-root h3,
+.md2pdf-root h4,
+.md2pdf-root h5,
+.md2pdf-root h6 {
+	margin-top: calc(var(--md2pdf-baseline) * ${halfUnits(s.headingSpaceBeforeEm)}) !important;
+	margin-bottom: calc(var(--md2pdf-baseline) * ${halfUnits(s.headingSpaceAfterEm)}) !important;
+}`
+		: "";
+
+	return `.md2pdf-root {
+	${gridVar}
+	${hyphenRule}
+	${alignRule}
+	${featureRule}
+	orphans: 2;
+	widows: 2;
+}
+.md2pdf-root p,
+.md2pdf-root li,
+.md2pdf-root blockquote {
+	text-wrap: ${s.textWrapPretty ? "pretty" : "wrap"};
+}
+.md2pdf-root h1,
+.md2pdf-root h2,
+.md2pdf-root h3,
+.md2pdf-root h4,
+.md2pdf-root h5,
+.md2pdf-root h6 {
+	text-wrap: balance;
+	${capsRule}
+}${gridRules}
+`;
+}
+
 /** Styles for the print content (the .md2pdf-root tree). Shared with the settings preview. */
 export function contentCss(s: MdToPdfSettings): string {
 	return `.md2pdf-root {
@@ -28,6 +94,7 @@ export function contentCss(s: MdToPdfSettings): string {
 	margin: 0;
 	background: white;
 }
+${typographyCss(s)}
 .md2pdf-root p,
 .md2pdf-root ul,
 .md2pdf-root ol,
@@ -147,7 +214,7 @@ const hideUiElements = `
 `;
 
 	return `<!DOCTYPE html>
-<html>
+<html lang="${escapeHtml(s.hyphenLang)}">
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(opts.title)}</title>

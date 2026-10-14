@@ -23,6 +23,20 @@ Set page margins in mm, cm, inches, points, or picas with the **Margin unit** dr
 
 Choose a font from the grouped dropdown. Headings and body text each have their own weight and italic settings. For bundled families, pick the variation with the radio button beside its preview. Previews are drawn at the chosen point size.
 
+### Typography
+
+The **Typography** section in settings controls:
+
+- **Pretty line wrapping** (`text-wrap: pretty`) avoids short last lines in paragraphs and list items. On by default.
+- **Hyphenation**, with a language for the hyphenation dictionary (for example `en-US`, `de`, or `fr`). Off by default.
+- **Justified text**. Off by default.
+- **Ligatures**. On by default. Turning them off disables `liga`, `clig`, and `dlig`.
+- **Oldstyle figures** (`onum`), if the font supports them.
+- **Small caps headings** (headings are set in small caps, with balanced line breaks).
+- **Baseline grid**. When enabled, paragraph and heading spacing snaps to multiples of the grid unit (in pt). This is an approximation: body line height is not forced to the grid.
+
+Hyphenation and justification are applied by Chromium's print engine, so they show in exported PDFs.
+
 ### Themes
 
 Use **Save current style as theme** to store the page, margin, font, heading weight and italic, code, and header/footer settings under a name. Load, delete, or reset from the Themes section. Themes are stored in the plugin's data file.

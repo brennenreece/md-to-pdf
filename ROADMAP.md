@@ -13,6 +13,7 @@ Goal: export Obsidian notes to PDFs that match the reading preview exactly, incl
 - BRNotation staff elements (clef, time signature, noteheads, stems, beams) export correctly.
 - Page setup: size, orientation, margins.
 - Body text: font, size, line height, paragraph spacing.
+- Typography: pretty line wrapping, hyphenation with language, justification, ligatures, oldstyle figures, small-caps headings, and an approximate baseline grid. Hyphenation confirmed in Chromium `printToPDF` output.
 - Global heading font, with per-level override switches (H1, H2, H3), and heading sizes and spacing.
 - Heading and body weight per level, with no forced bold. Bundled families choose weight and italic with radio buttons in their previews.
 - Font previews render each face at the chosen point size, labeled (regular, bold, italic, and so on). Bundled fonts load into the settings page.
@@ -31,6 +32,7 @@ Goal: export Obsidian notes to PDFs that match the reading preview exactly, incl
 - Bundled fonts in the export: TeX Gyre and League families render in the PDF, and the preview line in settings updates.
 - Themes: save, load, delete, and reset, including heading weights and italics.
 - Export with per-level heading weights, and the theme preview tab's sample against the PDF output.
+- Typography section: check justification, hyphenation, and the baseline grid in the Obsidian export.
 
 ## Next
 
