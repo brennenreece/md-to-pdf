@@ -25,11 +25,23 @@ export function lineHeightValue(
 	s: MdToPdfSettings,
 ): string {
 	if (s.baselineGridEnabled) {
-		const targetPt = unit === "pt" ? value : value * fontPt;
-		const units = Math.max(1, Math.round(targetPt / s.baselineGridPt));
-		return `calc(var(--md2pdf-baseline) * ${units})`;
+		return `calc(var(--md2pdf-baseline) * ${snappedLineHeightUnits(value, unit, fontPt, s.baselineGridPt)})`;
 	}
 	return unit === "pt" ? `${value}pt` : `${value}em`;
+}
+
+/**
+ * Number of grid units a line height snaps to when the baseline grid is on. Shared with the
+ * settings UI so the hint shown to the user matches what the print output uses.
+ */
+export function snappedLineHeightUnits(
+	value: number,
+	unit: "em" | "pt",
+	fontPt: number,
+	gridPt: number,
+): number {
+	const targetPt = unit === "pt" ? value : value * fontPt;
+	return Math.max(1, Math.round(targetPt / gridPt));
 }
 
 /**

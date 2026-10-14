@@ -10,7 +10,7 @@ import {
 	loadPreviewFont,
 	resolveFontCss,
 } from "./fonts";
-import { contentCss } from "./document";
+import { contentCss, snappedLineHeightUnits } from "./document";
 import { applyTheme, snapshotTheme } from "./themes";
 
 export type PageSize = "A4" | "A5" | "Letter" | "Legal";
@@ -754,14 +754,26 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		unitKey: "bodyLineHeightUnit" | "headingLineHeightUnit",
 	) {
 		const s = this.plugin.settings;
-		new Setting(el)
-			.setName(name)
+		const setting = new Setting(el).setName(name);
+		const hint = setting.descEl;
+		const refreshHint = () => {
+			if (!s.baselineGridEnabled) {
+				hint.setText("Set exactly in the chosen unit. Baseline grid is off.");
+				return;
+			}
+			const fontPt = valueKey === "bodyLineHeight" ? s.bodySizePt : s.h2SizePt;
+			const units = snappedLineHeightUnits(s[valueKey], s[unitKey], fontPt, s.baselineGridPt);
+			const pt = units * s.baselineGridPt;
+			hint.setText(`Baseline grid on: snaps to ${units} grid unit${units === 1 ? "" : "s"} (${pt} pt).`);
+		};
+		setting
 			.addText((t) =>
 				t.setValue(String(s[valueKey])).onChange(async (v) => {
 					const n = parseFloat(v);
 					if (!Number.isNaN(n) && n > 0) {
 						s[valueKey] = n;
 						await this.plugin.saveSettings();
+						refreshHint();
 					}
 				}),
 			)
@@ -772,8 +784,10 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 					.onChange(async (v) => {
 						s[unitKey] = v as LineHeightUnit;
 						await this.plugin.saveSettings();
+						refreshHint();
 					}),
 			);
+		refreshHint();
 	}
 
 	private numberSetting(el: HTMLElement, name: string, key: NumberKey) {
