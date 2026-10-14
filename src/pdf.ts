@@ -47,7 +47,9 @@ export async function printHtmlToPdf(
 		// Allow page to render (wait for layout engine)
 		await new Promise((resolve) => setTimeout(resolve, 500));
 		
-		const { headerTemplate, footerTemplate } = headerFooterTemplates(settings, title);
+		// Footer runs in its own document, so it needs the bundled @font-face rules from the body.
+		const fontFaceCss = html.match(/<style id="md2pdf-fonts">([\s\S]*?)<\/style>/)?.[1] ?? "";
+		const { headerTemplate, footerTemplate } = headerFooterTemplates(settings, title, fontFaceCss);
 		const buffer: Uint8Array = await win.webContents.printToPDF({
 			printBackground: true,
 			preferCSSPageSize: true,

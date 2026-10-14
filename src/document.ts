@@ -472,7 +472,7 @@ const hideUiElements = `
 <title>${escapeHtml(opts.title)}</title>
 <style>${reset}</style>
 <style>${opts.appCss}</style>
-<style>${opts.fontFaceCss}</style>
+<style id="md2pdf-fonts">${opts.fontFaceCss}</style>
 <style>${hideUiElements}</style>
 <style>${css}</style>
 ${opts.showBaselineGrid ? `<style>${baselineOverlayCss()}</style>` : ""}
@@ -491,6 +491,7 @@ ${topCapScript(s.baselineGridEnabled ? s.baselineGridPt : 0, s.pageBreakBeforeH1
 export function headerFooterTemplates(
 	s: MdToPdfSettings,
 	title: string,
+	fontFaceCss = "",
 ): { headerTemplate: string; footerTemplate: string } {
 	const dateStr = new Date().toISOString().slice(0, 10);
 	const headerText = s.headerText
@@ -502,7 +503,7 @@ export function headerFooterTemplates(
 	const pageHtml = s.pageNumberFormat
 		.replace("{page}", '<span class="pageNumber"></span>')
 		.replace("{pages}", '<span class="totalPages"></span>');
-	const footerTemplate = s.showPageNumbers ? footerWrap(pageHtml, s) : "<span></span>";
+	const footerTemplate = s.showPageNumbers ? footerWrap(pageHtml, s, fontFaceCss) : "<span></span>";
 
 	return { headerTemplate, footerTemplate };
 }
@@ -511,10 +512,11 @@ export function headerFooterTemplates(
  * Page-number footer: centered, styled like H3, and vertically centered in the bottom margin.
  * The box fills the bottom margin, so centering the text puts it halfway between the page edge and the margin.
  */
-function footerWrap(inner: string, s: MdToPdfSettings): string {
-	const family = s.h3OverrideFont ? resolveFontCss(s.h3Font) : resolveFontCss(s.headingFont);
-	const style = s.h3Italic ? "italic" : "normal";
-	return `<div style="width:100%; height:${s.marginBottomMm}mm; display:flex; align-items:center; justify-content:center; font-family:${escapeHtml(family)}; font-size:${s.h3SizePt}pt; font-weight:${s.h3Weight}; font-style:${style}; color:#000;">${inner}</div>`;
+function footerWrap(inner: string, s: MdToPdfSettings, fontFaceCss: string): string {
+	const family = s.h3OverrideFont ? s.h3Font : s.headingFont;
+	const css = `${fontFaceCss}
+.pf { width:100%; height:${s.marginBottomMm}mm; display:flex; align-items:center; justify-content:center; font-family:${resolveFontCss(family)} !important; font-size:${s.h3SizePt}pt; font-weight:${s.h3Weight}; font-style:normal; color:#000; }`;
+	return `<style>${css}</style><div class="pf">${inner}</div>`;
 }
 
 function wrapTemplate(inner: string, align: Alignment): string {
