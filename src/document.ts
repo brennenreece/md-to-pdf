@@ -239,29 +239,24 @@ function baselineGridMarkup(s: MdToPdfSettings): string {
 }
 
 /**
- * Print-time layout pass. Without the baseline grid it moves the first heading so its cap height
- * touches the top margin. With the grid on, it walks the top-level blocks in order and pads each
- * one down to the next grid line below its first baseline, so text baselines land on the grid.
+ * Print-time layout pass. Each page's first block, and each block that starts a page after a
+ * forced break, is positioned so its cap height touches the top margin. With the grid on, that
+ * block's baseline is moved to the first grid line at or below the cap line, so it never rises
+ * above the margin. Blocks that follow on the same page are padded down to the next grid line
+ * measured from the page start, so their baselines land on the grid too.
  * Runs in the print window, after the fonts it will print have loaded.
  */
-function topCapScript(gridPt: number): string {
+function topCapScript(gridPt: number, breakOnH1: boolean, breakOnHr: boolean): string {
 	return `<script>
 (function () {
 	var gridPx = ${JSON.stringify(gridPt)} * 4 / 3;
+	var breakOnH1 = ${JSON.stringify(breakOnH1)};
+	var breakOnHr = ${JSON.stringify(breakOnHr)};
 	function measureFont(el) {
 		var cs = getComputedStyle(el);
 		var ctx = document.createElement('canvas').getContext('2d');
 		ctx.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
-		return { m: ctx.measureText('H'), lh: parseFloat(cs.lineHeight) };
-	}
-	function alignCapLine() {
-		var root = document.querySelector('.md2pdf-root');
-		var h = root && root.firstElementChild;
-		if (!h || !/^H[1-6]$/.test(h.tagName)) return;
-		var f = measureFont(h);
-		var cap = f.m.actualBoundingBoxAscent;
-		var baselineInBox = (f.lh - (f.m.fontBoundingBoxAscent + f.m.fontBoundingBoxDescent)) / 2 + f.m.fontBoundingBoxAscent;
-		h.style.setProperty('margin-top', (cap - baselineInBox).toFixed(2) + 'px', 'important');
+		return ctx.measureText('H').actualBoundingBoxAscent;
 	}
 	// Zero-size inline probe: its bottom edge sits on the text baseline of the block's first line.
 	function baselineOf(el, root) {
@@ -276,28 +271,47 @@ function topCapScript(gridPt: number): string {
 		probe.remove();
 		return y;
 	}
-	function lockToGrid() {
+	function layoutPages() {
 		var root = document.querySelector('.md2pdf-root');
 		if (!root) return;
 		var kids = Array.prototype.slice.call(root.children);
+		var pageTop = 0;
+		var prevVisible = null;
 		for (var i = 0; i < kids.length; i++) {
 			var el = kids[i];
-			if (el.tagName === 'HR' || getComputedStyle(el).display === 'none') continue;
-			var rel = baselineOf(el, root);
-			// Next grid line at or below the current baseline. The first block never sits on the top edge.
-			var target = Math.ceil(rel / gridPx - 1e-6) * gridPx;
-			if (i === 0 && target <= 0) target = gridPx;
-			var delta = target - rel;
-			if (delta > 0.05) {
-				var cur = parseFloat(getComputedStyle(el).paddingTop) || 0;
-				el.style.setProperty('padding-top', (cur + delta).toFixed(2) + 'px', 'important');
+			if (el.tagName === 'HR' || getComputedStyle(el).display === 'none') {
+				if (el.tagName === 'HR' && getComputedStyle(el).display !== 'none') prevVisible = el;
+				continue;
+			}
+			var isStart = i === 0
+				|| (breakOnH1 && el.tagName === 'H1')
+				|| (breakOnHr && prevVisible !== null && prevVisible.tagName === 'HR');
+			prevVisible = null;
+			if (isStart) {
+				// Measure from the block's own top edge, with no margin or padding, to find the baseline offset.
+				el.style.setProperty('margin-top', '0px', 'important');
+				el.style.setProperty('padding-top', '0px', 'important');
+				var topBefore = el.getBoundingClientRect().top - root.getBoundingClientRect().top;
+				var rel = baselineOf(el, root) - topBefore;
+				var cap = measureFont(el);
+				var target = gridPx > 0 ? Math.ceil(cap / gridPx - 1e-6) * gridPx : cap;
+				var delta = target - rel;
+				el.style.setProperty('margin-top', delta.toFixed(2) + 'px', 'important');
+				pageTop = el.getBoundingClientRect().top - root.getBoundingClientRect().top - delta;
+				continue;
+			}
+			if (gridPx > 0) {
+				var rel2 = baselineOf(el, root) - pageTop;
+				var target2 = Math.ceil(rel2 / gridPx - 1e-6) * gridPx;
+				var delta2 = target2 - rel2;
+				if (delta2 > 0.05) {
+					var cur = parseFloat(getComputedStyle(el).paddingTop) || 0;
+					el.style.setProperty('padding-top', (cur + delta2).toFixed(2) + 'px', 'important');
+				}
 			}
 		}
 	}
-	document.fonts.ready.then(function () {
-		alignCapLine();
-		if (gridPx > 0) lockToGrid();
-	});
+	document.fonts.ready.then(layoutPages);
 })();
 </script>`;
 }
@@ -372,7 +386,7 @@ ${opts.showMargins ? `<style>${marginOverlayCss(s)}</style>` : ""}
 ${opts.showBaselineGrid ? baselineGridMarkup(s) : ""}
 ${opts.showMargins ? '<div class="md2pdf-margins"></div>' : ""}
 <div class="md2pdf-root markdown-rendered">${opts.bodyHtml}</div>
-${topCapScript(s.baselineGridEnabled ? s.baselineGridPt : 0)}
+${topCapScript(s.baselineGridEnabled ? s.baselineGridPt : 0, s.pageBreakBeforeH1, s.pageBreakOnHr)}
 </body>
 </html>`;
 }

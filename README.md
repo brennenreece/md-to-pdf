@@ -35,7 +35,7 @@ The **Typography** section in settings controls:
 - **Ligatures**. On by default. Turning them off disables `liga`, `clig`, and `dlig`.
 - **Oldstyle figures** (`onum`), if the font supports them.
 - **Small caps headings** (headings are set in small caps, with balanced line breaks).
-- **Baseline grid**. When enabled, body and heading line heights are whole multiples of the grid unit (in pt), block spacing snaps to half units, and each block's first baseline is moved onto a grid line. The first heading's cap height sits on the top margin, or on the first grid line below it when the grid is on.
+- **Baseline grid**. When enabled, body and heading line heights are whole multiples of the grid unit (in pt), block spacing snaps to half units, and each block's first baseline is moved onto a grid line. The first line of every page (including pages that start after a page break or `---` rule) has its cap height on the top margin, or on the first grid line below it when the grid is on.
 
 Hyphenation and justification are applied by Chromium's print engine, so they show in exported PDFs.
 
