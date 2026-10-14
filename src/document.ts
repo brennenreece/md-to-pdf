@@ -88,6 +88,8 @@ export function typographyCss(s: MdToPdfSettings): string {
 		? "hyphens: auto !important;\n\t-webkit-hyphens: auto !important;"
 		: "";
 	const alignRule = s.justify ? "text-align: justify !important;" : "";
+	// Avoids short last lines and one-word orphans in body text.
+	const prettyRule = ".md2pdf-root p, .md2pdf-root li, .md2pdf-root blockquote { text-wrap: pretty; }";
 
 	// Spacing snaps to whole or half baseline units. Half units keep headings close to their
 	// requested em spacing while still landing on the grid.
@@ -114,6 +116,7 @@ ${headingSpaceRules(s, (em) => `calc(var(--md2pdf-baseline) * ${halfUnits(em)})`
 	orphans: 2;
 	widows: 2;
 }
+${prettyRule}
 .md2pdf-root p,
 .md2pdf-root li,
 .md2pdf-root blockquote {
