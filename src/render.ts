@@ -139,7 +139,9 @@ export function collectAppCss(): string {
 			for (const rule of Array.from(sheet.cssRules)) {
 				const r = rule as CSSStyleRule;
 				// Include rules that match our relevant selectors
-				if (r.selectorText && relevantSelectors.some((sel) => r.selectorText.includes(sel))) {
+				// BRNotation class names share a "br-" prefix (e.g. br-chordgrid-*), so match them all.
+				const selector = r.selectorText ?? "";
+				if (selector && (selector.includes(".br-") || relevantSelectors.some((sel) => selector.includes(sel)))) {
 					parts.push(rule.cssText);
 				}
 				// Also include @font-face rules
