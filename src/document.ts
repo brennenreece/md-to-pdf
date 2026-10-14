@@ -513,10 +513,10 @@ export function headerFooterTemplates(
  * The box fills the bottom margin, so centering the text puts it halfway between the page edge and the margin.
  */
 /**
- * Measured in Obsidian's export: the page-number baseline sat about 2 pt above the margin midpoint,
- * which the footer template's layout does not account for.
+ * Measured in Obsidian's export: the page-number baseline sat above the margin midpoint, which the
+ * footer template's layout does not account for. Starts at 2 pt and was raised by 3 pt after review.
  */
-const FOOTER_BASELINE_NUDGE_PT = 2;
+const FOOTER_BASELINE_NUDGE_PT = 5;
 
 /** Half of League Gothic's cap height (735/1000 em), so the baseline drop centers the caps on the margin midpoint. */
 const CAP_HALF_DROP_EM = 0.735 / 2;
