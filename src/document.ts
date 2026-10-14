@@ -513,6 +513,12 @@ export function headerFooterTemplates(
  * The box fills the bottom margin, so centering the text puts it halfway between the page edge and the margin.
  */
 /**
+ * Measured in Obsidian's export: the page-number baseline sat about 2 pt above the margin midpoint,
+ * which the footer template's layout does not account for.
+ */
+const FOOTER_BASELINE_NUDGE_PT = 2;
+
+/**
  * Shift that centers the cap height in the line box. Line boxes center between ascent and
  * descent, which leaves a cap-height text high when the font's ascent exceeds its descent.
  * Metrics are for the bundled League Gothic; other fonts use the default line box.
@@ -530,7 +536,7 @@ function footerWrap(inner: string, s: MdToPdfSettings, fontFaceCss: string): str
 	const family = s.h3OverrideFont ? s.h3Font : s.headingFont;
 	const css = `${fontFaceCss}
 .pf { width:100%; height:${s.marginBottomMm}mm; display:flex; align-items:center; justify-content:center; font-family:${resolveFontCss(family)} !important; font-size:${s.h3SizePt}pt; font-weight:${s.h3Weight}; font-style:normal; color:#000; }
-.pf > span { position:relative; top:${capCenterOffsetEm(family)}em; }`;
+.pf > span { position:relative; top:calc(${capCenterOffsetEm(family)}em + ${FOOTER_BASELINE_NUDGE_PT}pt); }`;
 	return `<style>${css}</style><div class="pf"><span>${inner}</span></div>`;
 }
 
