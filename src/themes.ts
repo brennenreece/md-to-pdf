@@ -19,6 +19,7 @@ export const THEME_KEYS: Array<keyof ThemeData> = [
 	"marginRightMm",
 	"marginBottomMm",
 	"marginLeftMm",
+	"marginUnit",
 	"bodyFont",
 	"bodySizePt",
 	"bodyLineHeight",

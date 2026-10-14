@@ -16,6 +16,24 @@ import { applyTheme, snapshotTheme } from "./themes";
 export type PageSize = "A4" | "A5" | "Letter" | "Legal";
 export type Orientation = "portrait" | "landscape";
 export type Alignment = "left" | "center" | "right";
+export type MarginUnit = "mm" | "cm" | "in" | "pt" | "pc";
+
+/** Millimetres per one unit. */
+export const MM_PER_UNIT: Record<MarginUnit, number> = {
+	mm: 1,
+	cm: 10,
+	in: 25.4,
+	pt: 25.4 / 72,
+	pc: (25.4 / 72) * 12,
+};
+
+export const MARGIN_UNIT_LABELS: Record<MarginUnit, string> = {
+	mm: "Millimetres (mm)",
+	cm: "Centimetres (cm)",
+	in: "Inches (in)",
+	pt: "Points (pt)",
+	pc: "Picas (pc)",
+};
 
 export interface MdToPdfSettings {
 	pageSize: PageSize;
@@ -24,6 +42,8 @@ export interface MdToPdfSettings {
 	marginRightMm: number;
 	marginBottomMm: number;
 	marginLeftMm: number;
+	/** Display unit for the margin fields. Margins are always stored in mm. */
+	marginUnit: MarginUnit;
 
 	bodyFont: string;
 	bodyWeight: number;
@@ -77,6 +97,7 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	marginRightMm: 20,
 	marginBottomMm: 25,
 	marginLeftMm: 20,
+	marginUnit: "mm",
 
 	bodyFont: "Georgia, 'Times New Roman', serif",
 	bodyWeight: 400,
@@ -303,6 +324,16 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 					await save();
 				}),
 		);
+		new Setting(containerEl).setName("Margin unit").addDropdown((d) => {
+			for (const unit of Object.keys(MM_PER_UNIT) as MarginUnit[]) {
+				d.addOption(unit, MARGIN_UNIT_LABELS[unit]);
+			}
+			d.setValue(s.marginUnit).onChange(async (v) => {
+				s.marginUnit = v as MarginUnit;
+				await save();
+				this.refresh();
+			});
+		});
 		this.marginSetting(containerEl, "Top", "marginTopMm");
 		this.marginSetting(containerEl, "Right", "marginRightMm");
 		this.marginSetting(containerEl, "Bottom", "marginBottomMm");
@@ -436,11 +467,15 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 	}
 
 	private marginSetting(el: HTMLElement, side: string, key: MarginKey) {
-		new Setting(el).setName(`${side} margin (mm)`).addText((t) =>
-			t.setValue(String(this.plugin.settings[key])).onChange(async (v) => {
+		const unit = this.plugin.settings.marginUnit;
+		const factor = MM_PER_UNIT[unit];
+		const decimals = unit === "mm" || unit === "cm" ? 1 : 2;
+		const shown = +(this.plugin.settings[key] / factor).toFixed(decimals);
+		new Setting(el).setName(`${side} margin (${unit})`).addText((t) =>
+			t.setValue(String(shown)).onChange(async (v) => {
 				const n = parseFloat(v);
 				if (!Number.isNaN(n) && n >= 0) {
-					this.plugin.settings[key] = n;
+					this.plugin.settings[key] = n * factor;
 					await this.plugin.saveSettings();
 				}
 			}),
