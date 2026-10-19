@@ -1,5 +1,5 @@
 import type { MdToPdfSettings } from "./settings";
-import { stylesFromFlatSettings, type ParagraphStyles } from "./paragraph-styles";
+import { stylesFromFlatSettings, withMissingStyles, type ParagraphStyles } from "./paragraph-styles";
 
 /**
  * A theme is a named snapshot of the style settings. Page size and orientation, margins, and
@@ -108,5 +108,5 @@ export function applyTheme(s: MdToPdfSettings, theme: ThemeData): ParagraphStyle
 	for (const key of THEME_KEYS) {
 		if (key in theme) (s as unknown as Record<string, unknown>)[key] = theme[key];
 	}
-	return structuredClone(theme.styles ?? stylesFromFlatSettings(s));
+	return theme.styles ? withMissingStyles(theme.styles) : stylesFromFlatSettings(s);
 }

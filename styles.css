@@ -14,46 +14,31 @@
 	font-size: var(--font-ui-smaller);
 }
 
-.md2pdf-font-preview-row {
-	display: flex;
-	align-items: baseline;
-	gap: 10px;
-	min-width: 0;
-}
-
-.md2pdf-font-preview-label {
-	flex: 0 0 96px;
-	color: var(--text-muted);
-	font-size: var(--font-ui-smaller);
-}
-
-.md2pdf-font-preview-sample {
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	min-width: 0;
-}
-
-.md2pdf-font-preview-row input[type="radio"] {
-	margin: 0;
-	align-self: center;
-	flex: 0 0 auto;
-}
-
 .md2pdf-tabs {
 	display: flex;
 	gap: 8px;
 	margin-bottom: 12px;
 }
 
+/* Backdrop for the theme preview. The sheet inside is sized to the real page and scaled to fit. */
 .md2pdf-theme-preview {
-	max-width: 100%;
-	padding: 32px 36px;
+	position: relative;
+	width: 100%;
+	overflow: hidden;
+	background: var(--background-secondary);
+	border-radius: var(--radius-m);
+}
+
+/* One printed page: white paper at the real page size. Margins are applied as padding. */
+.md2pdf-theme-sheet {
+	position: absolute;
+	top: 0;
+	left: 0;
 	background: #fff;
 	color: #111;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: var(--radius-m);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 	box-sizing: border-box;
+	overflow: hidden;
 }
 
 /* PDF preview pane */
@@ -104,32 +89,39 @@
 }
 
 /* Paragraph styles editor */
+/* Paragraph Styles panel, modeled on InDesign: a compact list with one highlighted row, and dense fields below. */
 .md2pdf-style-list {
 	display: flex;
 	flex-direction: column;
+	background: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
-	margin-bottom: 12px;
-	overflow: hidden;
+	border-radius: 4px;
+	margin: 4px 0 12px 20px;
+	padding: 2px 0;
+	max-height: 260px;
+	overflow-y: auto;
 }
 .md2pdf-style-row {
 	display: flex;
 	justify-content: space-between;
-	align-items: baseline;
+	align-items: center;
 	gap: 12px;
-	padding: 6px 10px;
+	padding: 2px 10px;
+	min-height: 22px;
 	cursor: pointer;
-	border-bottom: 1px solid var(--background-modifier-border);
-}
-.md2pdf-style-row:last-child {
-	border-bottom: none;
+	font-size: var(--font-ui-small);
+	color: var(--text-normal);
 }
 .md2pdf-style-row:hover {
 	background: var(--background-modifier-hover);
 }
 .md2pdf-style-row.is-selected {
-	background: var(--background-modifier-active-hover);
-	font-weight: 600;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+.md2pdf-style-row.is-selected .md2pdf-style-summary {
+	color: var(--text-on-accent);
+	opacity: 0.8;
 }
 .md2pdf-style-name {
 	flex: 0 0 auto;
@@ -144,4 +136,171 @@
 .md2pdf-inherited .setting-item-description {
 	color: var(--text-faint);
 	font-style: italic;
+}
+
+.md2pdf-font-menu {
+	position: relative;
+	max-width: 260px;
+}
+
+.md2pdf-font-menu-button {
+	width: 100%;
+	text-align: left;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.md2pdf-font-popover {
+	position: absolute;
+	z-index: 1000;
+	max-height: 60vh;
+	overflow-y: auto;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+	padding: 4px 0;
+}
+
+.md2pdf-font-group-title {
+	padding: 6px 12px 2px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.md2pdf-font-row {
+	padding: 6px 12px;
+	cursor: pointer;
+}
+
+.md2pdf-font-row:hover,
+.md2pdf-font-row.is-selected {
+	background: var(--background-modifier-hover);
+}
+
+.md2pdf-font-row-name {
+	font-size: 15px;
+	color: var(--text-normal);
+}
+
+.md2pdf-font-row-sample {
+	font-size: 13px;
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.md2pdf-style-group {
+	margin: 0;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.md2pdf-style-group > summary {
+	cursor: pointer;
+	padding: 4px 0;
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-muted);
+}
+
+.md2pdf-style-group-body {
+	padding-bottom: 4px;
+}
+
+.md2pdf-style-group-body .setting-item {
+	padding: 4px 0;
+	border-top: none;
+	min-height: 0;
+}
+
+.md2pdf-style-group-body .setting-item-info {
+	flex: 1 1 auto;
+}
+
+.md2pdf-style-group-body .setting-item-description {
+	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.md2pdf-style-group-body .setting-item-control input[type="text"],
+.md2pdf-style-group-body .setting-item-control select {
+	height: 24px;
+	padding: 0 6px;
+	font-size: var(--font-ui-small);
+}
+
+.md2pdf-style-group-body .setting-item-control {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 0 0 auto;
+}
+
+.md2pdf-style-group-body .setting-item-control select {
+	max-width: 160px;
+}
+
+.md2pdf-style-group-body .setting-item-control .clickable-icon {
+	flex: 0 0 auto;
+}
+
+.md2pdf-style-group-body .setting-item-control input[type="text"] {
+	width: 72px;
+}
+
+.md2pdf-style-group-body .md2pdf-font-menu {
+	max-width: 200px;
+}
+
+.md2pdf-inline-label {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	margin-right: 4px;
+}
+
+/* Font and Style sit side by side; the checkbox flags sit on one wrapping row. */
+.md2pdf-field-row {
+	display: flex;
+	gap: 12px;
+	align-items: flex-start;
+}
+
+.md2pdf-field-row > .setting-item {
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+.md2pdf-check-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 16px;
+	padding: 6px 0;
+}
+
+.md2pdf-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--font-ui-small);
+}
+
+.md2pdf-check input[type="checkbox"] {
+	margin: 0;
+}
+
+.md2pdf-check.md2pdf-inherited {
+	color: var(--text-muted);
+}
+
+.md2pdf-check-reset {
+	padding: 0;
+	margin-left: 2px;
 }

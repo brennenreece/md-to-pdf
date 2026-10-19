@@ -16,7 +16,15 @@ export type StyleId =
 	| "blockquote"
 	| "listItem"
 	| "codeBlock"
-	| "inlineCode";
+	| "inlineCode"
+	| "link"
+	| "bold"
+	| "italic"
+	| "table"
+	| "hr"
+	| "callout"
+	| "image"
+	| "footnote";
 
 export type LineHeightUnit = "em" | "pt";
 export type TextAlign = "left" | "center" | "right" | "justify";
@@ -37,6 +45,7 @@ export interface StyleProps {
 	hyphenation: boolean;
 	ligatures: boolean;
 	smallCaps: boolean;
+	allCaps: boolean;
 	oldstyleFigures: boolean;
 	/** Start the element on a new page. Only meaningful for H1 today. */
 	pageBreakBefore: boolean;
@@ -68,6 +77,14 @@ export const STYLE_ORDER: StyleId[] = [
 	"listItem",
 	"codeBlock",
 	"inlineCode",
+	"link",
+	"bold",
+	"italic",
+	"table",
+	"hr",
+	"callout",
+	"image",
+	"footnote",
 ];
 
 export const STYLE_NAMES: Record<StyleId, string> = {
@@ -82,6 +99,14 @@ export const STYLE_NAMES: Record<StyleId, string> = {
 	listItem: "List item",
 	codeBlock: "Code block",
 	inlineCode: "Inline code",
+	link: "Link",
+	bold: "Bold",
+	italic: "Italic",
+	table: "Table",
+	hr: "Horizontal rule",
+	callout: "Callout",
+	image: "Image",
+	footnote: "Footnote",
 };
 
 /** The base font of the page. Other styles inherit it unless they set their own. */
@@ -99,6 +124,7 @@ const BODY_PROPS: StyleProps = {
 	hyphenation: false,
 	ligatures: true,
 	smallCaps: false,
+	allCaps: false,
 	oldstyleFigures: false,
 	pageBreakBefore: false,
 };
@@ -148,7 +174,27 @@ export const DEFAULT_PARAGRAPH_STYLES: ParagraphStyles = {
 		basedOn: "body",
 		props: { font: "Menlo, Consolas, monospace", sizePt: 9 },
 	},
+	link: { id: "link", name: STYLE_NAMES.link, basedOn: "body", props: {} },
+	bold: { id: "bold", name: STYLE_NAMES.bold, basedOn: "body", props: {} },
+	italic: { id: "italic", name: STYLE_NAMES.italic, basedOn: "body", props: {} },
+	table: { id: "table", name: STYLE_NAMES.table, basedOn: "body", props: {} },
+	hr: { id: "hr", name: STYLE_NAMES.hr, basedOn: "body", props: {} },
+	callout: { id: "callout", name: STYLE_NAMES.callout, basedOn: "body", props: {} },
+	image: { id: "image", name: STYLE_NAMES.image, basedOn: "body", props: {} },
+	footnote: { id: "footnote", name: STYLE_NAMES.footnote, basedOn: "body", props: {} },
 };
+
+/**
+ * Fills in any style that saved data does not have yet, such as styles added in a later
+ * version. Saved entries are kept as they are.
+ */
+export function withMissingStyles(saved: Partial<ParagraphStyles> | undefined): ParagraphStyles {
+	const out = structuredClone(DEFAULT_PARAGRAPH_STYLES);
+	for (const id of STYLE_ORDER) {
+		if (saved?.[id]) out[id] = { ...out[id], ...saved[id], props: { ...saved[id]!.props } };
+	}
+	return out;
+}
 
 export class StyleCycleError extends Error {}
 

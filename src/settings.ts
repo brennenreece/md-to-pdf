@@ -5,11 +5,12 @@ import {
 	fontKeysInUse,
 	loadPreviewFont,
 } from "./fonts";
-import { contentCss } from "./document";
+import { PAGE_MM, contentCss } from "./document";
 import { LENGTH_UNIT_LABELS, LengthUnit, convertLength } from "./length";
 import { applyTheme, snapshotTheme } from "./themes";
-import { renderStyleEditor } from "./style-editor";
+import { renderStyleEditor, type StyleEditorState } from "./style-editor";
 import { DEFAULT_PARAGRAPH_STYLES, type StyleId } from "./paragraph-styles";
+import { addCheckbox, addInlineLabel } from "./ui";
 
 export type PageSize = "A4" | "A5" | "Letter" | "Legal";
 export type Orientation = "portrait" | "landscape";
@@ -83,7 +84,6 @@ export interface MdToPdfSettings {
 	h3SpaceAfterEm: number;
 	h3SpaceBeforeUnit: LengthUnit;
 	h3SpaceAfterUnit: LengthUnit;
-	/** Space before and after H4 to H6. */
 	headingSpaceBeforeEm: number;
 	headingSpaceAfterEm: number;
 	/** Display units for heading spacing. Values are stored in em. */
@@ -280,66 +280,65 @@ type NumberKey =
 	| "headingSpaceAfterEm"
 	| "headingLineHeight"
 	| "codeSizePt";
-type BoolTypographyKey =
-	| "baselineGridEnabled"
-	| "textWrapPretty"
-	| "justify"
-	| "hyphenation"
-	| "ligatures"
-	| "smallCapsHeadings"
-	| "oldstyleFigures";
 /** Units for fields stored in pt (font sizes, grid). */
 const ABSOLUTE_UNITS: LengthUnit[] = ["pt", "pc", "in", "cm", "mm"];
 
-
 type MarginKey = "marginTopMm" | "marginRightMm" | "marginBottomMm" | "marginLeftMm";
 
-type WeightKey = "h1Weight" | "h2Weight" | "h3Weight" | "bodyWeight";
-type ItalicKey = "h1Italic" | "h2Italic" | "h3Italic" | "bodyItalic";
-
-/** Sample page for the theme preview. Covers every heading level and the common text styles. */
+/**
+ * Sample page for the theme preview. Each element is labeled with the paragraph style it uses,
+ * so the preview shows exactly which style controls what.
+ */
 const THEME_PREVIEW_HTML = `
-<h1>Lorem Ipsum Dolor</h1>
-<p>Lorem ipsum dolor sit amet, <strong>consectetur adipiscing</strong> elit, sed do <em>eiusmod tempor</em> incididunt ut labore et dolore magna aliqua. <a href="#">Ut enim ad minim</a> veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-<h2>Duis Aute Irure</h2>
-<p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
-<h3>Sed Ut Perspiciatis</h3>
-<p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis.</p>
-<h4>Nemo Enim Ipsam</h4>
-<p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.</p>
-<h5>Neque Porro Quisquam</h5>
-<p>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet.</p>
-<p>Extraordinarily unbelievable interdisciplinary professionalization continues to be notoriously difficult to typeset without considerable forethought and careful measurement across many repeated paragraphs of running text.</p>
-<h6>Quis Autem Vel Eum</h6>
-<p>Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae.</p>
-<p><em>Italic text</em>, <strong>bold text</strong>, and <code>inline code</code> sit beside each other.</p>
+<h1>Heading 1 (H1)</h1>
+<p>Body text. Lorem ipsum dolor sit amet, <strong>bold text</strong>, <em>italic text</em>, and <code>inline code</code> sit in one paragraph. <a href="#">A link</a> continues the line.</p>
+<h2>Heading 2 (H2)</h2>
+<p>Body text under H2. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+<h3>Heading 3 (H3)</h3>
+<p>Body text under H3. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium.</p>
+<h4>Heading 4 (H4)</h4>
+<p>Body text under H4. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.</p>
+<h5>Heading 5 (H5)</h5>
+<p>Body text under H5. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet.</p>
+<h6>Heading 6 (H6)</h6>
+<p>Body text under H6. Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae.</p>
+<p>List (ul / li):</p>
 <ul>
-<li>Lorem ipsum dolor sit amet</li>
-<li>Consectetur adipiscing elit</li>
-<li>Sed do eiusmod tempor</li>
+<li>First list item</li>
+<li>Second list item</li>
 </ul>
+<p>Numbered list (ol / li):</p>
 <ol>
-<li>Ut enim ad minim veniam</li>
-<li>Quis nostrud exercitation</li>
+<li>First numbered item</li>
+<li>Second numbered item</li>
 </ol>
-<blockquote><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque lacinia mauris at nulla.</p></blockquote>
-<pre><code>const lorem = "ipsum dolor sit amet";
-console.log(lorem);</code></pre>
+<p>Blockquote:</p>
+<blockquote><p>Quote text. Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p></blockquote>
+<p>Code block (pre / code):</p>
+<pre><code>const sample = "monospaced code";
+console.log(sample);</code></pre>
+<p>Table (table / th / td):</p>
 <table>
-<thead><tr><th>Lorem</th><th>Ipsum</th><th>Dolor</th></tr></thead>
+<thead><tr><th>Column A</th><th>Column B</th><th>Column C</th></tr></thead>
 <tbody>
-<tr><td>Sit amet</td><td>Consectetur</td><td>Adipiscing</td></tr>
-<tr><td>Sed do</td><td>Eiusmod</td><td>Tempor</td></tr>
+<tr><td>Cell one</td><td>Cell two</td><td>Cell three</td></tr>
+<tr><td>Cell four</td><td>Cell five</td><td>Cell six</td></tr>
 </tbody>
 </table>
 <hr>
-<p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+<p>Text after a horizontal rule.</p>
+<p>Callout (callout):</p>
+<div class="callout" data-callout="note"><div class="callout-title"><div class="callout-title-inner">Note</div></div><div class="callout-content"><p>Callout text. Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p></div></div>
+<p>Image (img):</p>
+<p><img src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='80'%3E%3Crect width='240' height='80' fill='%23cccccc'/%3E%3Ctext x='120' y='46' font-size='14' text-anchor='middle' font-family='sans-serif'%3EImage%3C/text%3E%3C/svg%3E" alt="Sample image"></p>
+<p>Footnote reference<sup><a href="#fn1">1</a></sup> sits in the text.</p>
+<div class="footnotes"><hr><ol><li id="fn1"><p>Footnote (footnote). Lorem ipsum dolor sit amet.</p></li></ol></div>
 `;
 
 export class MdToPdfSettingTab extends PluginSettingTab {
 	plugin: MdToPdfPlugin;
 	private tab: "settings" | "preview" = "settings";
-	private styleState = { selected: "body" as StyleId };
+	private styleState: StyleEditorState = { selected: "body" as StyleId, openGroups: {} };
 
 	constructor(app: App, plugin: MdToPdfPlugin) {
 		super(app, plugin);
@@ -362,14 +361,30 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		}
 	}
 
-	/** Sample page rendered with the same print CSS as export, so it shows what the PDF will look like. */
+	/**
+	 * Sample page rendered with the same print CSS as export. The page is drawn at the chosen page size,
+	 * orientation, and margins, scaled to fit the settings pane, so the layout matches the printed PDF.
+	 */
 	private renderThemePreview(el: HTMLElement) {
 		const s = this.plugin.settings;
+		const [w, h] = PAGE_MM[s.pageSize];
+		const [pageW, pageH] = s.orientation === "landscape" ? [h, w] : [w, h];
+		const pxPerMm = 96 / 25.4;
+		const widthPx = pageW * pxPerMm;
+		const heightPx = pageH * pxPerMm;
 		const wrap = el.createDiv({ cls: "md2pdf-theme-preview" });
 		const status = wrap.createDiv({ cls: "md2pdf-font-preview-status", text: "Loading fonts…" });
 		wrap.createEl("style", { text: contentCss(s, this.plugin.styles) });
-		const page = wrap.createDiv({ cls: "md2pdf-root markdown-rendered" });
+		const sheet = wrap.createDiv({ cls: "md2pdf-theme-sheet" });
+		sheet.setAttr("style", `width: ${widthPx}px; height: ${heightPx}px; padding: ${s.marginTopMm * pxPerMm}px ${s.marginRightMm * pxPerMm}px ${s.marginBottomMm * pxPerMm}px ${s.marginLeftMm * pxPerMm}px;`);
+		const page = sheet.createDiv({ cls: "md2pdf-root markdown-rendered" });
 		page.innerHTML = THEME_PREVIEW_HTML;
+		const fit = () => {
+			const scale = Math.min(1, (wrap.clientWidth - 2) / widthPx);
+			sheet.setCssStyles({ transform: `scale(${scale})`, transformOrigin: "top left" });
+			wrap.setCssStyles({ height: `${heightPx * scale + 2}px` });
+		};
+		window.requestAnimationFrame(fit);
 
 		const families = fontKeysInUse(this.plugin.styles)
 			.map((key) => findBundledFamily(key))
@@ -405,89 +420,76 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		const save = () => this.plugin.saveSettings();
 
 		new Setting(containerEl).setName("Page").setHeading();
-		new Setting(containerEl).setName("Page size").addDropdown((d) =>
-			d
-				.addOptions({ A4: "A4", A5: "A5", Letter: "Letter", Legal: "Legal" })
+		const pageRow = new Setting(containerEl).setName("Page size and orientation");
+		pageRow.addDropdown((d) => {
+			d.addOptions({ A4: "A4", A5: "A5", Letter: "Letter", Legal: "Legal" })
 				.setValue(s.pageSize)
 				.onChange(async (v) => {
 					s.pageSize = v as PageSize;
 					await save();
-				}),
-		);
-		new Setting(containerEl).setName("Orientation").addDropdown((d) =>
-			d
-				.addOptions({ portrait: "Portrait", landscape: "Landscape" })
+				});
+			addInlineLabel(d.selectEl, "Size");
+		});
+		pageRow.addDropdown((d) => {
+			d.addOptions({ portrait: "Portrait", landscape: "Landscape" })
 				.setValue(s.orientation)
 				.onChange(async (v) => {
 					s.orientation = v as Orientation;
 					await save();
-				}),
-		);
-		new Setting(containerEl).setName("Margin unit").addDropdown((d) => {
-			for (const unit of Object.keys(MM_PER_UNIT) as MarginUnit[]) {
-				d.addOption(unit, MARGIN_UNIT_LABELS[unit]);
-			}
-			d.setValue(s.marginUnit).onChange(async (v) => {
-				s.marginUnit = v as MarginUnit;
-				await save();
-				this.refresh();
-			});
+				});
+			addInlineLabel(d.selectEl, "Orientation");
 		});
-		this.marginSetting(containerEl, "Top", "marginTopMm");
-		this.marginSetting(containerEl, "Right", "marginRightMm");
-		this.marginSetting(containerEl, "Bottom", "marginBottomMm");
-		this.marginSetting(containerEl, "Left", "marginLeftMm");
+		this.marginSetting(containerEl);
+		const hrRow = new Setting(containerEl).setName("Page break at horizontal rule (---)");
+		addCheckbox(hrRow, s.pageBreakOnHr, async (v) => {
+			s.pageBreakOnHr = v;
+			await save();
+		});
+
+		new Setting(containerEl).setName("Typography").setHeading();
+		this.baselineGridSetting(containerEl);
+		this.textSetting(containerEl, "Hyphenation language", "BCP 47 tag, for example en-US.", "hyphenLang");
 
 		new Setting(containerEl).setName("Paragraph styles").setHeading();
-		this.boolSetting(containerEl, "Baseline grid", "Snap body and heading spacing to a vertical rhythm.", "baselineGridEnabled");
-		this.lengthSetting(containerEl, "Baseline grid unit", "baselineGridPt", "baselineGridUnit", ABSOLUTE_UNITS, this.plugin.settings.bodySizePt);
-		this.textSetting(containerEl, "Hyphenation language", "hyphenLang");
 		renderStyleEditor(containerEl, {
 			styles: this.plugin.styles,
 			save: () => this.plugin.saveSettings(),
 			refresh: () => this.refresh(),
+			adapter: this.app.vault.adapter,
+			pluginDir: this.plugin.manifest.dir ?? "",
 		}, this.styleState);
 
-		new Setting(containerEl).setName("Page breaks").setHeading();
-		new Setting(containerEl).setName("Page break at horizontal rule (---)").addToggle((t) =>
-			t.setValue(s.pageBreakOnHr).onChange(async (v) => {
-				s.pageBreakOnHr = v;
-				await save();
-			}),
-		);
-
 		new Setting(containerEl).setName("Header and footer").setHeading();
-		new Setting(containerEl).setName("Show header").addToggle((t) =>
-			t.setValue(s.showHeader).onChange(async (v) => {
-				s.showHeader = v;
-				await save();
-			}),
-		);
-		this.textSetting(containerEl, "Header text ({{title}}, {{date}})", "headerText");
-		new Setting(containerEl).setName("Show page numbers").addToggle((t) =>
-			t.setValue(s.showPageNumbers).onChange(async (v) => {
-				s.showPageNumbers = v;
-				await save();
-			}),
-		);
-		this.textSetting(containerEl, "Page number format ({page}, {pages})", "pageNumberFormat");
+		const headerRow = new Setting(containerEl).setName("Show header").setDesc("Placeholders: {{title}}, {{date}}.");
+		addCheckbox(headerRow, s.showHeader, async (v) => {
+			s.showHeader = v;
+			await save();
+		});
+		this.inlineText(headerRow, "headerText", "Text", 240);
+		const pageNumRow = new Setting(containerEl).setName("Show page numbers").setDesc("Placeholders: {page}, {pages}.");
+		addCheckbox(pageNumRow, s.showPageNumbers, async (v) => {
+			s.showPageNumbers = v;
+			await save();
+		});
+		this.inlineText(pageNumRow, "pageNumberFormat", "Format", 180);
 
 		new Setting(containerEl).setName("PDF preview").setHeading();
-		new Setting(containerEl).setName("Live update").setDesc("Re-render the preview pane when the note or settings change.").addToggle((t) =>
-			t.setValue(s.livePreview).onChange(async (v) => {
-				s.livePreview = v;
-				await save();
-			}),
-		);
-		new Setting(containerEl).setName("Update delay (ms)").setDesc("Wait this long after the last change before re-rendering.").addText((t) =>
+		const liveRow = new Setting(containerEl).setName("Live update").setDesc("Re-render the preview pane when the note or settings change.");
+		addCheckbox(liveRow, s.livePreview, async (v) => {
+			s.livePreview = v;
+			await save();
+		});
+		liveRow.addText((t) => {
+			addInlineLabel(t.inputEl, "Delay (ms)");
+			t.inputEl.style.width = "72px";
 			t.setValue(String(s.livePreviewDelayMs)).onChange(async (v) => {
 				const n = parseInt(v, 10);
 				if (!Number.isNaN(n) && n >= 0) {
 					s.livePreviewDelayMs = n;
 					await save();
 				}
-			}),
-		);
+			});
+		});
 
 		new Setting(containerEl).setName("Themes").setHeading();
 		this.themeSettings(containerEl);
@@ -548,7 +550,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			.setName("Reset to defaults")
 			.setDesc("Restores the built-in style. Saved themes are kept.")
 			.addButton((b) =>
-				b.setButtonText("Reset").onClick(async () => {
+				b.setButtonText("Reset").setWarning().onClick(async () => {
 					this.plugin.styles = applyTheme(this.plugin.settings, snapshotTheme(DEFAULT_SETTINGS, DEFAULT_PARAGRAPH_STYLES));
 					await this.plugin.saveSettings();
 					this.refresh();
@@ -556,43 +558,73 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			);
 	}
 
-	private marginSetting(el: HTMLElement, side: string, key: MarginKey) {
-		const unit = this.plugin.settings.marginUnit;
+	/** Margin unit and all four margins on one row. Each field is labeled with its side. */
+	private marginSetting(el: HTMLElement) {
+		const s = this.plugin.settings;
+		const unit = s.marginUnit;
 		const factor = MM_PER_UNIT[unit];
 		const decimals = unit === "mm" || unit === "cm" ? 1 : 2;
-		const shown = +(this.plugin.settings[key] / factor).toFixed(decimals);
-		new Setting(el).setName(`${side} margin (${unit})`).addText((t) =>
-			t.setValue(String(shown)).onChange(async (v) => {
-				const n = parseFloat(v);
-				if (!Number.isNaN(n) && n >= 0) {
-					this.plugin.settings[key] = n * factor;
-					await this.plugin.saveSettings();
-				}
-			}),
-		);
+		const row = new Setting(el).setName("Margins");
+		row.addDropdown((d) => {
+			for (const u of Object.keys(MM_PER_UNIT) as MarginUnit[]) {
+				d.addOption(u, MARGIN_UNIT_LABELS[u]);
+			}
+			d.setValue(unit).onChange(async (v) => {
+				s.marginUnit = v as MarginUnit;
+				await this.plugin.saveSettings();
+				this.refresh();
+			});
+			addInlineLabel(d.selectEl, "Unit");
+		});
+		const sides: Array<[string, MarginKey]> = [
+			["Top", "marginTopMm"],
+			["Right", "marginRightMm"],
+			["Bottom", "marginBottomMm"],
+			["Left", "marginLeftMm"],
+		];
+		for (const [side, key] of sides) {
+			const shown = +(s[key] / factor).toFixed(decimals);
+			row.addText((t) => {
+				addInlineLabel(t.inputEl, side);
+				t.inputEl.style.width = "56px";
+				t.setValue(String(shown)).onChange(async (v) => {
+					const n = parseFloat(v);
+					if (!Number.isNaN(n) && n >= 0) {
+						s[key] = n * factor;
+						await this.plugin.saveSettings();
+					}
+				});
+			});
+		}
 	}
 
-	/**
-	 * Font picker for one text role. One dropdown lists system stacks and bundled families.
-	 * The preview lists every face of the chosen family with its label. Each face has a radio button
-	 * that sets the weight and italic for that role.
-	 */
-	/**
-	 * Labeled preview lines for the chosen font, drawn at the role's size. Bundled families show each
-	 * face. When a weight key is given, each upright face gets a radio button that selects that weight.
-	 * System stacks show a single regular line.
-	 */
-	/**
-	 * One heading level: an own-font switch, the level's font (when the switch is on), weight, italic,
-	 * and size. H1 also gets the new-page toggle on its size row.
-	 */
-	/** Space before and after one heading level. */
-	/**
-	 * Weight dropdown for a text role. Bundled families choose their weight with radio buttons in the
-	 * font preview instead, so this only handles system fonts.
-	 */
-	private textSetting(el: HTMLElement, name: string, key: TextKey) {
-		new Setting(el).setName(name).addText((t) =>
+	/** Baseline grid on/off toggle and its value, on one row. */
+	private baselineGridSetting(el: HTMLElement) {
+		const s = this.plugin.settings;
+		const row = new Setting(el)
+			.setName("Baseline grid")
+			.setDesc("Snap body and heading spacing to a vertical rhythm.");
+		addCheckbox(row, s.baselineGridEnabled, async (v) => {
+			s.baselineGridEnabled = v;
+			await this.plugin.saveSettings();
+		});
+		this.lengthControls(row, "baselineGridPt", "baselineGridUnit", ABSOLUTE_UNITS, s.bodySizePt, "Unit");
+	}
+
+	/** Text field with an inline label, added to an existing setting row. */
+	private inlineText(row: Setting, key: TextKey, label: string, widthPx: number) {
+		row.addText((t) => {
+			addInlineLabel(t.inputEl, label);
+			t.inputEl.style.width = `${widthPx}px`;
+			t.setValue(this.plugin.settings[key]).onChange(async (v) => {
+				this.plugin.settings[key] = v;
+				await this.plugin.saveSettings();
+			});
+		});
+	}
+
+	private textSetting(el: HTMLElement, name: string, desc: string, key: TextKey) {
+		new Setting(el).setName(name).setDesc(desc).addText((t) =>
 			t.setValue(this.plugin.settings[key]).onChange(async (v) => {
 				this.plugin.settings[key] = v;
 				await this.plugin.saveSettings();
@@ -600,32 +632,22 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		);
 	}
 
-	private boolSetting(el: HTMLElement, name: string, desc: string, key: BoolTypographyKey) {
-		new Setting(el).setName(name).setDesc(desc).addToggle((t) =>
-			t.setValue(this.plugin.settings[key]).onChange(async (v) => {
-				this.plugin.settings[key] = v;
-				await this.plugin.saveSettings();
-			}),
-		);
-	}
-
-	/** Line height value with a dropdown for its unit (em multiplier or pt). */
 	/**
 	 * A length field with a unit dropdown. The value is stored in its canonical unit (pt or em)
 	 * and shown in the selected unit. Converting an em value to an absolute unit needs the font
 	 * size it multiplies, passed as `basePt`.
 	 */
-	private lengthSetting(
-		el: HTMLElement,
-		name: string,
+	/** Value field and unit dropdown added to an existing setting row. */
+	private lengthControls(
+		setting: Setting,
 		key: NumberKey,
 		unitKey: UnitKey,
 		units: LengthUnit[],
 		basePt: number,
-	): Setting {
+		unitLabel?: string,
+	) {
 		const s = this.plugin.settings;
 		const canonical: LengthUnit = units.includes("em") ? "em" : "pt";
-		const setting = new Setting(el).setName(name);
 		const show = () => {
 			const unit = s[unitKey];
 			const v = convertLength(s[key], canonical, unit, basePt);
@@ -642,6 +664,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 				}),
 			)
 			.addDropdown((d) => {
+				if (unitLabel) addInlineLabel(d.selectEl, unitLabel);
 				for (const unit of units) d.addOption(unit, LENGTH_UNIT_LABELS[unit]);
 				d.setValue(s[unitKey]).onChange(async (v) => {
 					s[unitKey] = v as LengthUnit;
@@ -649,6 +672,5 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 					this.refresh();
 				});
 			});
-		return setting;
 	}
 }

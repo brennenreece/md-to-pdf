@@ -1,4 +1,4 @@
-import { Setting } from "obsidian";
+import { Setting, setIcon } from "obsidian";
 import {
 	STYLE_NAMES,
 	STYLE_ORDER,
@@ -11,27 +11,31 @@ import {
 	type TextAlign,
 	type TextWrap,
 } from "./paragraph-styles";
-import { FONT_OPTIONS } from "./settings";
+import { renderFontMenu, type FontMenuHost } from "./font-menu";
+import { faceLabel, findBundledFamily } from "./fonts";
+import { addCheckbox } from "./ui";
 
 /** Fields grouped the way the InDesign character and paragraph panels group them. */
 type Field = {
 	key: StyleKey;
 	label: string;
-	kind: "font" | "number" | "pt" | "bool" | "select" | "weight";
+	kind: "font" | "number" | "pt" | "bool" | "check" | "select" | "face";
 	options?: Record<string, string>;
+	/** Return true to leave this field out for the given style. */
+	hide?: (id: StyleId) => boolean;
 };
 
 const GROUPS: Array<{ title: string; fields: Field[] }> = [
 	{
 		title: "Character",
 		fields: [
-			{ key: "font", label: "Font", kind: "font" },
-			{ key: "weight", label: "Weight", kind: "weight" },
-			{ key: "italic", label: "Italic", kind: "bool" },
 			{ key: "sizePt", label: "Size (pt)", kind: "pt" },
-			{ key: "smallCaps", label: "Small caps", kind: "bool" },
-			{ key: "oldstyleFigures", label: "Oldstyle figures", kind: "bool" },
-			{ key: "ligatures", label: "Ligatures", kind: "bool" },
+			{ key: "font", label: "Font", kind: "font" },
+			{ key: "weight", label: "Style", kind: "face" },
+			{ key: "smallCaps", label: "Small caps", kind: "check" },
+			{ key: "allCaps", label: "All caps", kind: "check" },
+			{ key: "ligatures", label: "Ligatures", kind: "check" },
+			{ key: "oldstyleFigures", label: "Oldstyle figures", kind: "check" },
 		],
 	},
 	{
@@ -55,7 +59,7 @@ const GROUPS: Array<{ title: string; fields: Field[] }> = [
 				} satisfies Record<TextWrap, string>,
 			},
 			{ key: "hyphenation", label: "Hyphenation", kind: "bool" },
-			{ key: "pageBreakBefore", label: "Page break before", kind: "bool" },
+			{ key: "pageBreakBefore", label: "Page break before", kind: "bool", hide: (id) => ["inlineCode", "link", "bold", "italic", "hr", "footnote"].includes(id) },
 		],
 	},
 	{
@@ -71,9 +75,11 @@ const GROUPS: Array<{ title: string; fields: Field[] }> = [
 
 export interface StyleEditorState {
 	selected: StyleId;
+	/** Group titles the user has expanded. Kept across re-renders so a change does not fold them. */
+	openGroups: Record<string, boolean>;
 }
 
-export interface StyleEditorHost {
+export interface StyleEditorHost extends FontMenuHost {
 	styles: ParagraphStyles;
 	save(): Promise<void>;
 	refresh(): void;
@@ -130,9 +136,27 @@ export function renderStyleEditor(el: HTMLElement, host: StyleEditorHost, state:
 		});
 
 	for (const group of GROUPS) {
-		new Setting(el).setName(group.title).setHeading();
+		const details = el.createEl("details", { cls: "md2pdf-style-group" });
+		details.open = state.openGroups[group.title] ?? false;
+		details.addEventListener("toggle", () => {
+			state.openGroups[group.title] = details.open;
+		});
+		details.createEl("summary", { text: group.title });
+		const body = details.createDiv({ cls: "md2pdf-style-group-body" });
+		let pendingRow: HTMLElement | null = null;
+		let checkRow: HTMLElement | null = null;
 		for (const field of group.fields) {
-			renderField(el, host, id, field, resolved);
+			if (field.hide?.(id)) continue;
+			if (field.kind === "check") {
+				checkRow ??= body.createDiv({ cls: "md2pdf-check-row" });
+				renderCheck(checkRow, host, id, field, resolved);
+			} else if (field.key === "font" || field.key === "weight") {
+				// Font and Style share one row, so the face dropdown sits beside the font name.
+				pendingRow ??= body.createDiv({ cls: "md2pdf-field-row" });
+				renderField(pendingRow, host, id, field, resolved);
+			} else {
+				renderField(body, host, id, field, resolved);
+			}
 		}
 	}
 
@@ -147,6 +171,42 @@ export function renderStyleEditor(el: HTMLElement, host: StyleEditorHost, state:
 					host.refresh();
 				}),
 			);
+	}
+}
+
+/** A labeled checkbox for a small-caps, ligature, or figure flag, with the same override state as other fields. */
+function renderCheck(
+	el: HTMLElement,
+	host: StyleEditorHost,
+	id: StyleId,
+	field: Field,
+	resolved: { props: StyleProps; from: Record<StyleKey, StyleId> },
+) {
+	const style = host.styles[id];
+	const overridden = Object.prototype.hasOwnProperty.call(style.props, field.key);
+	const source = resolved.from[field.key];
+	const inheritedFrom = !overridden && source && source !== id ? STYLE_NAMES[source] : null;
+	const wrap = el.createDiv({ cls: "md2pdf-check" });
+	if (!overridden && inheritedFrom) wrap.addClass("md2pdf-inherited");
+	const label = wrap.createEl("label");
+	const box = label.createEl("input", { attr: { type: "checkbox" } });
+	box.checked = resolved.props[field.key] as boolean;
+	label.createSpan({ text: field.label });
+	if (overridden) wrap.setAttr("title", "Overridden in this style.");
+	else if (inheritedFrom) wrap.setAttr("title", `Inherited from ${inheritedFrom}.`);
+	box.addEventListener("change", async () => {
+		(style.props as Record<string, unknown>)[field.key] = box.checked;
+		await host.save();
+		host.refresh();
+	});
+	if (overridden) {
+		const reset = wrap.createEl("button", { cls: "clickable-icon md2pdf-check-reset", attr: { "aria-label": "Reset to inherited value" } });
+		setIcon(reset, "rotate-ccw");
+		reset.addEventListener("click", async () => {
+			delete (style.props as Record<string, unknown>)[field.key];
+			await host.save();
+			host.refresh();
+		});
 	}
 }
 
@@ -174,35 +234,55 @@ function renderField(
 
 	switch (field.kind) {
 		case "font":
+			setting.controlEl.addClass("md2pdf-font-control");
+			renderFontMenu(setting.controlEl, host, current as string, async (v) => {
+				write(v);
+				await host.save();
+				host.refresh();
+			});
+			break;
+		case "face": {
+			const family = findBundledFamily(resolved.props.font);
 			setting.addDropdown((d) => {
-				for (const [value, label] of Object.entries(FONT_OPTIONS)) d.addOption(value, label);
-				const shown = current as string;
-				if (!(shown in FONT_OPTIONS)) d.addOption(shown, shown);
-				d.setValue(shown).onChange(async (v) => {
-					write(v);
+				if (family) {
+					// Each option is one face the family ships, so the choice always matches a real file.
+					family.faces.forEach((face, i) => d.addOption(String(i), faceLabel(face)));
+					const currentIndex = family.faces.findIndex(
+						(f) => f.weight === resolved.props.weight && f.italic === resolved.props.italic,
+					);
+					d.setValue(String(currentIndex >= 0 ? currentIndex : 0));
+				} else {
+					// System fonts are not bundled, so offer only the two weights every installed family has.
+					for (const w of [400, 700]) {
+						for (const italic of [false, true]) {
+							const label = `${faceLabel({ file: "", weight: w, italic })}`;
+							d.addOption(`${w}-${italic}`, label);
+						}
+					}
+					d.setValue(`${resolved.props.weight >= 550 ? 700 : 400}-${resolved.props.italic}`);
+				}
+				d.onChange(async (v) => {
+					if (family) {
+						const face = family.faces[parseInt(v, 10)];
+						write(face.weight);
+						(style.props as Record<string, unknown>).italic = face.italic;
+					} else {
+						const [w, i] = v.split("-");
+						write(parseInt(w, 10));
+						(style.props as Record<string, unknown>).italic = i === "true";
+					}
 					await host.save();
 					host.refresh();
 				});
 			});
 			break;
-		case "weight":
-			setting.addDropdown((d) => {
-				for (const w of [100, 200, 300, 400, 500, 600, 700, 800, 900]) d.addOption(String(w), String(w));
-				d.setValue(String(current)).onChange(async (v) => {
-					write(parseInt(v, 10));
-					await host.save();
-					host.refresh();
-				});
-			});
-			break;
+		}
 		case "bool":
-			setting.addToggle((t) =>
-				t.setValue(current as boolean).onChange(async (v) => {
-					write(v);
-					await host.save();
-					host.refresh();
-				}),
-			);
+			addCheckbox(setting, current as boolean, async (v) => {
+				write(v);
+				await host.save();
+				host.refresh();
+			});
 			break;
 		case "select":
 			setting.addDropdown((d) => {

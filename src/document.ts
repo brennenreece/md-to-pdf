@@ -1,9 +1,9 @@
 import type { Alignment, MdToPdfSettings } from "./settings";
-import { findBundledFamily, resolveFontCss } from "./fonts";
+import { findBundledFamily, resolveFontCss, shippedWeight } from "./fonts";
 import type { ParagraphStyles } from "./paragraph-styles";
-import { styleCss } from "./style-css";
+import { pageBreakTags, styleCss } from "./style-css";
 
-const PAGE_MM: Record<string, [number, number]> = {
+export const PAGE_MM: Record<string, [number, number]> = {
 	A4: [210, 297],
 	A5: [148, 210],
 	Letter: [215.9, 279.4],
@@ -146,7 +146,7 @@ function baselineGridMarkup(s: MdToPdfSettings): string {
  */
 function topCapScript(
 	gridPt: number,
-	breakOnH1: boolean,
+	breakTags: string[],
 	breakOnHr: boolean,
 	pageHeightPx: number,
 	pageWidthPx: number,
@@ -154,7 +154,7 @@ function topCapScript(
 	return `<script>
 (function () {
 	var gridPx = ${JSON.stringify(gridPt)} * 4 / 3;
-	var breakOnH1 = ${JSON.stringify(breakOnH1)};
+	var breakTags = ${JSON.stringify(breakTags)};
 	var breakOnHr = ${JSON.stringify(breakOnHr)};
 	var pageHeightPx = ${JSON.stringify(pageHeightPx)};
 	var pageWidthPx = ${JSON.stringify(pageWidthPx)};
@@ -229,7 +229,7 @@ function topCapScript(
 			}
 			var isStart = i === 0
 				|| el === forcedStart
-				|| (breakOnH1 && el.tagName === 'H1')
+				|| breakTags.indexOf(el.tagName) !== -1
 				|| (breakOnHr && prevVisible !== null && prevVisible.tagName === 'HR');
 			prevVisible = null;
 			if (!isStart && pageHeightPx > 0) {
@@ -346,7 +346,7 @@ ${opts.showMargins ? `<style>${marginOverlayCss(s)}</style>` : ""}
 ${opts.showBaselineGrid ? baselineGridMarkup(s) : ""}
 ${opts.showMargins ? '<div class="md2pdf-margins"></div>' : ""}
 <div class="md2pdf-root markdown-rendered">${opts.bodyHtml}</div>
-${topCapScript(s.baselineGridEnabled ? s.baselineGridPt : 0, s.pageBreakBeforeH1, s.pageBreakOnHr, printableHeightPx(s), printableWidthPx(s))}
+${topCapScript(s.baselineGridEnabled ? s.baselineGridPt : 0, pageBreakTags(opts.styles), s.pageBreakOnHr, printableHeightPx(s), printableWidthPx(s))}
 </body>
 </html>`;
 }
@@ -402,7 +402,7 @@ function capCenterOffsetEm(family: string): number {
 function footerWrap(inner: string, s: MdToPdfSettings, fontFaceCss: string): string {
 	const family = s.h3OverrideFont ? s.h3Font : s.headingFont;
 	const css = `${fontFaceCss}
-.pf { width:100%; height:${s.marginBottomMm}mm; display:flex; align-items:center; justify-content:center; font-family:${resolveFontCss(family)} !important; font-size:${s.h3SizePt}pt; font-weight:${s.h3Weight}; font-style:normal; color:#000; }
+.pf { width:100%; height:${s.marginBottomMm}mm; display:flex; align-items:center; justify-content:center; font-family:${resolveFontCss(family)} !important; font-size:${s.h3SizePt}pt; font-weight:${shippedWeight(family, s.h3Weight, false)}; font-synthesis:none; font-style:normal; color:#000; }
 .pf > span { position:relative; top:calc(${capCenterOffsetEm(family)}em + ${FOOTER_BASELINE_NUDGE_PT}pt + ${CAP_HALF_DROP_EM}em); }`;
 	return `<style>${css}</style><div class="pf"><span>${inner}</span></div>`;
 }

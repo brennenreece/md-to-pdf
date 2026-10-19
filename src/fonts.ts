@@ -166,19 +166,23 @@ export async function buildBundledFontFaces(
 		const family = findBundledFamily(key);
 		if (!family || seen.has(family.id)) continue;
 		seen.add(family.id);
-		for (const face of family.faces) {
-			try {
-				const bytes = await adapter.readBinary(`${pluginDir}/${FONT_DIR}/${family.collection}/${face.file}`);
-				const b64 = arrayBufferToBase64(bytes);
-				const format = face.file.endsWith(".ttf") ? "truetype" : "opentype";
-				rules.push(
-					`@font-face { font-family: ${bundledCssName(family)}; font-style: ${face.italic ? "italic" : "normal"}; ` +
-						`font-weight: ${face.weight}; src: url(data:font/${format};base64,${b64}) format("${format}"); }`,
-				);
-			} catch (err) {
-				console.error(`[md-to-pdf] missing bundled font ${face.file}`, err);
-			}
-		}
+		const faceRules = await Promise.all(
+			family.faces.map(async (face) => {
+				try {
+					const bytes = await adapter.readBinary(`${pluginDir}/${FONT_DIR}/${family.collection}/${face.file}`);
+					const b64 = arrayBufferToBase64(bytes);
+					const format = face.file.endsWith(".ttf") ? "truetype" : "opentype";
+					return (
+						`@font-face { font-family: ${bundledCssName(family)}; font-style: ${face.italic ? "italic" : "normal"}; ` +
+						`font-weight: ${face.weight}; src: url(data:font/${format};base64,${b64}) format("${format}"); }`
+					);
+				} catch (err) {
+					console.error(`[md-to-pdf] missing bundled font ${face.file}`, err);
+					return null;
+				}
+			}),
+		);
+		for (const rule of faceRules) if (rule) rules.push(rule);
 	}
 	return rules.join("\n");
 }
@@ -197,6 +201,22 @@ function arrayBufferToBase64(buf: ArrayBuffer): string {
 export function resolveFontCss(value: string): string {
 	const family = findBundledFamily(value);
 	return family ? `${bundledCssName(family)}, serif` : value;
+}
+
+/**
+ * The weight to emit for a font. Bundled families only ship certain weights, so the nearest
+ * shipped weight (preferring the same italic state) is used. Other fonts keep the requested weight.
+ */
+export function shippedWeight(fontValue: string, weight: number, italic: boolean): number {
+	const family = findBundledFamily(fontValue);
+	if (!family || family.faces.length === 0) return weight;
+	const sameStyle = family.faces.filter((f) => f.italic === italic);
+	const pool = sameStyle.length > 0 ? sameStyle : family.faces;
+	let best = pool[0];
+	for (const face of pool) {
+		if (Math.abs(face.weight - weight) < Math.abs(best.weight - weight)) best = face;
+	}
+	return best.weight;
 }
 
 /** Keys for every font a document uses, so only those families are embedded. */
@@ -225,29 +245,35 @@ export function faceLabel(face: BundledFace): string {
 	return weight;
 }
 
-const previewStyleIds = new Set<string>();
+const previewLoads = new Map<string, Promise<void>>();
 
 /**
  * Makes every face of a bundled family available to the settings preview. The same @font-face
  * rules used by export are injected into a style element, so the preview loads fonts the same
- * way the printed output does. Runs once per family; a failed read is retried on the next call.
+ * way the printed output does. Each family loads once; the promise is cached so repeated calls
+ * share the work. A failed load is dropped from the cache so the next call retries.
  */
-export async function loadPreviewFont(
+export function loadPreviewFont(
 	adapter: { readBinary(path: string): Promise<ArrayBuffer> },
 	pluginDir: string,
 	family: BundledFamily,
 ): Promise<void> {
-	if (previewStyleIds.has(family.id)) return;
-	const rules = await buildBundledFontFaces(adapter, pluginDir, [bundledFontKey(family)]);
-	if (!rules) throw new Error(`No font files could be read for ${family.name}`);
-	const style = document.createElement("style");
-	style.id = `md2pdf-preview-${family.id}`;
-	style.textContent = rules;
-	document.head.appendChild(style);
-	previewStyleIds.add(family.id);
-	await Promise.all(
-		family.faces.map((face) =>
-			document.fonts.load(`${face.italic ? "italic " : ""}${face.weight} 16px ${bundledCssName(family)}`),
-		),
-	);
+	const cached = previewLoads.get(family.id);
+	if (cached) return cached;
+	const load = (async () => {
+		const rules = await buildBundledFontFaces(adapter, pluginDir, [bundledFontKey(family)]);
+		if (!rules) throw new Error(`No font files could be read for ${family.name}`);
+		const style = document.createElement("style");
+		style.id = `md2pdf-preview-${family.id}`;
+		style.textContent = rules;
+		document.head.appendChild(style);
+		await Promise.all(
+			family.faces.map((face) =>
+				document.fonts.load(`${face.italic ? "italic " : ""}${face.weight} 16px ${bundledCssName(family)}`),
+			),
+		);
+	})();
+	previewLoads.set(family.id, load);
+	load.catch(() => previewLoads.delete(family.id));
+	return load;
 }

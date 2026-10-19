@@ -1,4 +1,4 @@
-import { resolveFontCss } from "./fonts";
+import { resolveFontCss, shippedWeight } from "./fonts";
 import { resolveStyle, type ParagraphStyles, type StyleId, type StyleProps } from "./paragraph-styles";
 
 /** Page-level options that are not part of any paragraph style. */
@@ -21,7 +21,51 @@ const SELECTORS: Record<StyleId, string> = {
 	listItem: ".md2pdf-root li",
 	codeBlock: ".md2pdf-root pre, .md2pdf-root pre code",
 	inlineCode: ".md2pdf-root code",
+	link: ".md2pdf-root a",
+	bold: ".md2pdf-root strong, .md2pdf-root b",
+	italic: ".md2pdf-root em, .md2pdf-root i",
+	table: ".md2pdf-root table",
+	hr: ".md2pdf-root hr",
+	callout: ".md2pdf-root .callout",
+	image: ".md2pdf-root img, .md2pdf-root figure",
+	footnote: ".md2pdf-root .footnotes, .md2pdf-root .footnotes li",
 };
+
+/**
+ * Elements a page break can start. Inline code is left out because a break cannot start inside a line.
+ * Body text breaks on paragraphs and list items, not on the wrapper, which would leave a blank first page.
+ */
+export const PAGE_BREAK_STYLES: StyleId[] = [
+	"body", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "listItem", "codeBlock", "table",
+];
+
+/**
+ * Elements a page break applies to. Only top-level blocks break, so a paragraph or list nested
+ * inside a list item does not split the list. The page-start script in document.ts checks the same blocks.
+ */
+const BREAK_SELECTORS: Partial<Record<StyleId, string>> = {
+	body: ".md2pdf-root > p, .md2pdf-root > ul, .md2pdf-root > ol",
+	h1: ".md2pdf-root > h1", h2: ".md2pdf-root > h2", h3: ".md2pdf-root > h3",
+	h4: ".md2pdf-root > h4", h5: ".md2pdf-root > h5", h6: ".md2pdf-root > h6",
+	blockquote: ".md2pdf-root > blockquote",
+	listItem: ".md2pdf-root > ul > li, .md2pdf-root > ol > li",
+	codeBlock: ".md2pdf-root > pre",
+	table: ".md2pdf-root > table",
+};
+
+/** Style ids whose page break is on, for the page-start script in document.ts. */
+export function pageBreakTags(styles: ParagraphStyles): string[] {
+	const tags: string[] = [];
+	const map: Partial<Record<StyleId, string[]>> = {
+		body: ["P", "UL", "OL"], h1: ["H1"], h2: ["H2"], h3: ["H3"], h4: ["H4"], h5: ["H5"], h6: ["H6"],
+		blockquote: ["BLOCKQUOTE"], listItem: ["LI"], codeBlock: ["PRE"], table: ["TABLE"],
+	};
+	for (const id of PAGE_BREAK_STYLES) {
+		const { props, from } = resolveStyle(styles, id);
+		if (props.pageBreakBefore && from.pageBreakBefore === id) tags.push(...(map[id] ?? []));
+	}
+	return tags;
+}
 
 /**
  * Line height for a style. With the baseline grid on, the value snaps to whole grid units.
@@ -55,15 +99,17 @@ function declarations(props: StyleProps, grid: { enabled: boolean; pt: number },
 	const lines = [
 		`font-family: ${resolveFontCss(props.font)}${bang};`,
 		`font-size: ${props.sizePt}pt${bang};`,
-		`font-weight: ${props.weight}${bang};`,
+		`font-weight: ${shippedWeight(props.font, props.weight, props.italic)}${bang};`,
+		`font-synthesis: none${bang};`,
 		`font-style: ${props.italic ? "italic" : "normal"}${bang};`,
 		`line-height: ${lineHeightCss(props.lineHeight, props.lineHeightUnit, props.sizePt, grid)}${bang};`,
 		`text-align: ${props.align}${bang};`,
 		`text-wrap: ${props.textWrap};`,
 		`hyphens: ${props.hyphenation ? "auto" : "manual"};`,
 		`-webkit-hyphens: ${props.hyphenation ? "auto" : "manual"};`,
-		`font-variant-caps: ${props.smallCaps ? "all-small-caps" : "normal"};`,
+		`font-variant-caps: ${props.smallCaps && !props.allCaps ? "all-small-caps" : "normal"};`,
 	];
+	if (props.allCaps) lines.push("text-transform: uppercase;");
 	if (features.length) lines.push(`font-feature-settings: ${features.join(", ")};`);
 	return lines.map((l) => `\t${l}`).join("\n");
 }
@@ -112,14 +158,25 @@ ${declarations(body, grid, true)}
 	}
 	parts.push(`.md2pdf-root h1:first-child { margin-top: 0 !important; }`);
 
-	const h1 = resolveStyle(styles, "h1").props;
-	if (h1.pageBreakBefore) {
-		parts.push(
-			".md2pdf-root h1:not(:first-child) { break-before: page !important; page-break-before: always !important; }",
-		);
+	for (const id of PAGE_BREAK_STYLES) {
+		const { props, from } = resolveStyle(styles, id);
+		// Only a style that sets the break itself gets one, so headings do not inherit a break from body.
+		if (props.pageBreakBefore && from.pageBreakBefore === id) {
+			for (const sel of (BREAK_SELECTORS[id] ?? SELECTORS[id]).split(",")) {
+				parts.push(`${sel.trim()}:not(:first-child) { break-before: page !important; page-break-before: always !important; }`);
+			}
+		}
 	}
 
 	for (const id of ["codeBlock", "inlineCode"] as const) {
+		const { props } = resolveStyle(styles, id);
+		parts.push(`${SELECTORS[id]} {\n${declarations(props, grid, true)}\n}`);
+	}
+
+	// Inline and table styles only emit CSS when they set something of their own,
+	// so the default output does not change.
+	for (const id of ["link", "bold", "italic", "table", "hr", "callout", "image", "footnote"] as const) {
+		if (Object.keys(styles[id].props).length === 0) continue;
 		const { props } = resolveStyle(styles, id);
 		parts.push(`${SELECTORS[id]} {\n${declarations(props, grid, true)}\n}`);
 	}

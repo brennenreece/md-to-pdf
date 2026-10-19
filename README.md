@@ -10,7 +10,7 @@ Early development. Export works for body content, page setup, typography, header
 
 ### Fonts
 
-The font dropdown lists the system stacks, then two bundled collections:
+The font menu lists the system stacks, then two bundled collections:
 
 - **TeX Gyre**: Adventor, Bonum, Cursor, Heros, Heros Condensed, Pagella, Schola, Termes. Licensed under the GUST Font License (`assets/fonts/tg/LICENSE-GFL.txt`).
 - **League of Moveable Type**: all families in the collection, licensed under the SIL Open Font License 1.1 (`assets/fonts/league/LICENSE-OFL.txt`). See `assets/fonts/league/NOTICE.md` for copyright notices.
@@ -25,17 +25,17 @@ Font sizes, the baseline grid unit, and paragraph spacing each have a value and 
 
 ### Paragraph styles
 
-The **Paragraph styles** section works like InDesign's Paragraph Styles panel. It lists the built-in styles: Body, H1–H6, Block quote, List item, Code block, and Inline code. Click a style to edit it. Notes stay plain Markdown, so the set of styles is fixed.
+The **Paragraph styles** section works like InDesign's Paragraph Styles panel. It lists the built-in styles: Body, H1–H6, Block quote, List item, Code block, Inline code, Link, Bold, Italic, Table, Horizontal rule, Callout, Image, and Footnote. Link, Bold, Italic, Table, Horizontal rule, Callout, Image, and Footnote inherit from Body until you change them. Click a style to edit it. Notes stay plain Markdown, so the set of styles is fixed.
 
 Each style has a **Based on** dropdown. A style uses the values of its base for any property it does not override. An overridden value shows a reset icon. Inherited values show "Inherited from" with the name of the base style. **Reset all to based-on style** clears every override for the selected style.
 
-Each style has these settings:
+Each style has these settings. Each group folds open and closed, and all groups start folded:
 
-- **Character**: font, weight, italic, size, small caps, oldstyle figures, and ligatures.
-- **Paragraph**: alignment (left, center, right, or justify), text wrap (`text-wrap: pretty` or `balance`), hyphenation, and page break before.
+- **Character**: size, font, style (the faces the typeface ships), small caps, all caps, ligatures, and oldstyle figures (checkboxes).
+- **Paragraph**: alignment (left, center, right, or justify), text wrap (`text-wrap: pretty` or `balance`), hyphenation, and page break before. Page break before works on any block style (body text, headings, blockquotes, list items, and code blocks); inline code cannot take one.
 - **Spacing**: line height, space before, and space after. Each has a value and a unit dropdown.
 
-Choose a font from the grouped dropdown. Bundled families have a variation picker beside the preview. Previews are drawn at the chosen point size.
+The font field opens a menu grouped into System fonts, TeX Gyre, and League of Moveable Type. Each entry is drawn in its own font with a sample line, so you can compare fonts before picking one. Bundled fonts load when the menu opens.
 
 The baseline grid and the hyphenation language apply to the whole document. They are in the same section.
 
