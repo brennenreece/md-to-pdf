@@ -1,18 +1,15 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type MdToPdfPlugin from "./main";
 import {
-	BUNDLED_FAMILIES,
-	COLLECTION_LABELS,
-	bundledFontKey,
-	faceLabel,
 	findBundledFamily,
 	fontKeysInUse,
 	loadPreviewFont,
-	resolveFontCss,
 } from "./fonts";
-import { contentCss, snappedLineHeightUnits } from "./document";
+import { contentCss } from "./document";
 import { LENGTH_UNIT_LABELS, LengthUnit, convertLength } from "./length";
 import { applyTheme, snapshotTheme } from "./themes";
+import { renderStyleEditor } from "./style-editor";
+import { DEFAULT_PARAGRAPH_STYLES, type StyleId } from "./paragraph-styles";
 
 export type PageSize = "A4" | "A5" | "Letter" | "Legal";
 export type Orientation = "portrait" | "landscape";
@@ -283,7 +280,6 @@ type NumberKey =
 	| "headingSpaceAfterEm"
 	| "headingLineHeight"
 	| "codeSizePt";
-type BoolKey = "h1OverrideFont" | "h2OverrideFont" | "h3OverrideFont";
 type BoolTypographyKey =
 	| "baselineGridEnabled"
 	| "textWrapPretty"
@@ -294,35 +290,12 @@ type BoolTypographyKey =
 	| "oldstyleFigures";
 /** Units for fields stored in pt (font sizes, grid). */
 const ABSOLUTE_UNITS: LengthUnit[] = ["pt", "pc", "in", "cm", "mm"];
-/** Units for spacing fields stored in em. Em is listed first as the default. */
-const SPACING_UNITS: LengthUnit[] = ["em", "pt", "pc", "in", "cm", "mm"];
 
-/** Settings key holding the display unit for each size field. */
-const UNIT_KEY_FOR_SIZE: Record<string, UnitKey> = {
-	h1SizePt: "h1SizeUnit",
-	h2SizePt: "h2SizeUnit",
-	h3SizePt: "h3SizeUnit",
-};
 
 type MarginKey = "marginTopMm" | "marginRightMm" | "marginBottomMm" | "marginLeftMm";
 
 type WeightKey = "h1Weight" | "h2Weight" | "h3Weight" | "bodyWeight";
 type ItalicKey = "h1Italic" | "h2Italic" | "h3Italic" | "bodyItalic";
-/** The weight and italic settings that a role's preview radio buttons write to. */
-interface FaceKeys {
-	weight: WeightKey;
-	italic: ItalicKey;
-}
-
-/** Weights offered for system fonts, which have no weight list of their own. */
-const SYSTEM_WEIGHTS: Array<[number, string]> = [
-	[300, "Light"],
-	[400, "Regular"],
-	[500, "Medium"],
-	[600, "Semibold"],
-	[700, "Bold"],
-	[800, "Extra bold"],
-];
 
 /** Sample page for the theme preview. Covers every heading level and the common text styles. */
 const THEME_PREVIEW_HTML = `
@@ -366,6 +339,7 @@ console.log(lorem);</code></pre>
 export class MdToPdfSettingTab extends PluginSettingTab {
 	plugin: MdToPdfPlugin;
 	private tab: "settings" | "preview" = "settings";
+	private styleState = { selected: "body" as StyleId };
 
 	constructor(app: App, plugin: MdToPdfPlugin) {
 		super(app, plugin);
@@ -393,11 +367,11 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		const s = this.plugin.settings;
 		const wrap = el.createDiv({ cls: "md2pdf-theme-preview" });
 		const status = wrap.createDiv({ cls: "md2pdf-font-preview-status", text: "Loading fonts…" });
-		wrap.createEl("style", { text: contentCss(s) });
+		wrap.createEl("style", { text: contentCss(s, this.plugin.styles) });
 		const page = wrap.createDiv({ cls: "md2pdf-root markdown-rendered" });
 		page.innerHTML = THEME_PREVIEW_HTML;
 
-		const families = fontKeysInUse(s)
+		const families = fontKeysInUse(this.plugin.styles)
 			.map((key) => findBundledFamily(key))
 			.filter((f): f is NonNullable<typeof f> => f !== undefined);
 		Promise.all(families.map((f) => loadPreviewFont(this.app.vault.adapter, this.plugin.manifest.dir ?? "", f)))
@@ -464,35 +438,15 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		this.marginSetting(containerEl, "Bottom", "marginBottomMm");
 		this.marginSetting(containerEl, "Left", "marginLeftMm");
 
-		new Setting(containerEl).setName("Body text").setHeading();
-		this.fontSetting(containerEl, "Body font", "bodyFont", s.bodySizePt, { weight: "bodyWeight", italic: "bodyItalic" });
-		this.weightSetting(containerEl, "Body weight", "bodyFont", null, "bodyWeight", "bodyItalic");
-		this.lengthSetting(containerEl, "Font size", "bodySizePt", "bodySizeUnit", ABSOLUTE_UNITS, this.plugin.settings.bodySizePt);
-		this.lineHeightSetting(containerEl, "Line height", "bodyLineHeight", "bodyLineHeightUnit");
-		this.lengthSetting(containerEl, "Paragraph spacing", "paragraphSpacingEm", "paragraphSpacingUnit", SPACING_UNITS, this.plugin.settings.bodySizePt);
-
-		new Setting(containerEl).setName("Typography").setHeading();
+		new Setting(containerEl).setName("Paragraph styles").setHeading();
 		this.boolSetting(containerEl, "Baseline grid", "Snap body and heading spacing to a vertical rhythm.", "baselineGridEnabled");
 		this.lengthSetting(containerEl, "Baseline grid unit", "baselineGridPt", "baselineGridUnit", ABSOLUTE_UNITS, this.plugin.settings.bodySizePt);
-		this.boolSetting(containerEl, "Text wrap (avoid orphans)", "Balance last lines to avoid single words.", "textWrapPretty");
-		this.boolSetting(containerEl, "Justify text", "Align body text to both margins.", "justify");
-		this.boolSetting(containerEl, "Hyphenation", "Break long words at line ends. Needs a language.", "hyphenation");
 		this.textSetting(containerEl, "Hyphenation language", "hyphenLang");
-		this.boolSetting(containerEl, "Ligatures", "Use fi, fl, and similar joined letterforms.", "ligatures");
-		this.boolSetting(containerEl, "Small caps headings", "Set headings in small capitals.", "smallCapsHeadings");
-		this.boolSetting(containerEl, "Oldstyle figures", "Use figures that sit within the x-height.", "oldstyleFigures");
-
-		new Setting(containerEl).setName("Headings").setHeading();
-		this.fontSetting(containerEl, "Heading font (all levels)", "headingFont", s.h1SizePt);
-		this.lengthSetting(containerEl, "H4–H6 space before", "headingSpaceBeforeEm", "headingSpaceBeforeUnit", SPACING_UNITS, s.bodySizePt);
-		this.lengthSetting(containerEl, "H4–H6 space after", "headingSpaceAfterEm", "headingSpaceAfterUnit", SPACING_UNITS, s.bodySizePt);
-		this.lineHeightSetting(containerEl, "Heading line height", "headingLineHeight", "headingLineHeightUnit");
-		this.headingLevel(containerEl, "H1", "h1Font", "h1SizePt", "h1OverrideFont", { weight: "h1Weight", italic: "h1Italic" }, true);
-		this.headingSpacing(containerEl, "H1", "h1");
-		this.headingLevel(containerEl, "H2", "h2Font", "h2SizePt", "h2OverrideFont", { weight: "h2Weight", italic: "h2Italic" });
-		this.headingSpacing(containerEl, "H2", "h2");
-		this.headingLevel(containerEl, "H3", "h3Font", "h3SizePt", "h3OverrideFont", { weight: "h3Weight", italic: "h3Italic" });
-		this.headingSpacing(containerEl, "H3", "h3");
+		renderStyleEditor(containerEl, {
+			styles: this.plugin.styles,
+			save: () => this.plugin.saveSettings(),
+			refresh: () => this.refresh(),
+		}, this.styleState);
 
 		new Setting(containerEl).setName("Page breaks").setHeading();
 		new Setting(containerEl).setName("Page break at horizontal rule (---)").addToggle((t) =>
@@ -501,10 +455,6 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 				await save();
 			}),
 		);
-
-		new Setting(containerEl).setName("Code").setHeading();
-		this.fontSetting(containerEl, "Code font", "codeFont", s.codeSizePt);
-		this.lengthSetting(containerEl, "Code size", "codeSizePt", "codeSizeUnit", ABSOLUTE_UNITS, this.plugin.settings.bodySizePt);
 
 		new Setting(containerEl).setName("Header and footer").setHeading();
 		new Setting(containerEl).setName("Show header").addToggle((t) =>
@@ -555,7 +505,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			.addButton((b) =>
 				b.setButtonText("Save").setCta().onClick(async () => {
 					if (!nameValue) return;
-					const snapshot = snapshotTheme(this.plugin.settings);
+					const snapshot = snapshotTheme(this.plugin.settings, this.plugin.styles);
 					const existing = themes.find((t) => t.name === nameValue);
 					if (existing) existing.settings = snapshot;
 					else themes.push({ name: nameValue, settings: snapshot });
@@ -578,7 +528,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 					b.setButtonText("Load").onClick(async () => {
 						const theme = themes.find((t) => t.name === selected);
 						if (!theme) return;
-						applyTheme(this.plugin.settings, theme.settings);
+						this.plugin.styles = applyTheme(this.plugin.settings, theme.settings);
 						await this.plugin.saveSettings();
 						this.refresh();
 					}),
@@ -599,7 +549,7 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			.setDesc("Restores the built-in style. Saved themes are kept.")
 			.addButton((b) =>
 				b.setButtonText("Reset").onClick(async () => {
-					applyTheme(this.plugin.settings, snapshotTheme(DEFAULT_SETTINGS));
+					this.plugin.styles = applyTheme(this.plugin.settings, snapshotTheme(DEFAULT_SETTINGS, DEFAULT_PARAGRAPH_STYLES));
 					await this.plugin.saveSettings();
 					this.refresh();
 				}),
@@ -627,190 +577,20 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 	 * The preview lists every face of the chosen family with its label. Each face has a radio button
 	 * that sets the weight and italic for that role.
 	 */
-	private fontSetting(el: HTMLElement, name: string, key: TextKey, sizePt: number, faceKeys?: FaceKeys) {
-		new Setting(el).setName(name).addDropdown((d) => {
-			const current = this.plugin.settings[key];
-			const select = d.selectEl;
-			select.empty();
-
-			const system = document.createElement("optgroup");
-			system.label = COLLECTION_LABELS.system;
-			for (const [value, label] of Object.entries(FONT_OPTIONS)) {
-				system.appendChild(new Option(label, value));
-			}
-			select.appendChild(system);
-
-			for (const collection of ["tg", "league"] as const) {
-				const group = document.createElement("optgroup");
-				group.label = COLLECTION_LABELS[collection];
-				for (const family of BUNDLED_FAMILIES.filter((f) => f.collection === collection)) {
-					group.appendChild(new Option(family.name, bundledFontKey(family)));
-				}
-				select.appendChild(group);
-			}
-
-			const known = Array.from(select.options).some((o) => o.value === current);
-			if (!known) select.insertBefore(new Option(current, current), select.firstChild);
-
-			d.setValue(current).onChange(async (v) => {
-				this.plugin.settings[key] = v;
-				await this.plugin.saveSettings();
-				this.refresh();
-			});
-		});
-
-		this.fontPreview(el, this.plugin.settings[key], sizePt, faceKeys);
-	}
-
 	/**
 	 * Labeled preview lines for the chosen font, drawn at the role's size. Bundled families show each
 	 * face. When a weight key is given, each upright face gets a radio button that selects that weight.
 	 * System stacks show a single regular line.
 	 */
-	private fontPreview(el: HTMLElement, value: string, sizePt: number, faceKeys?: FaceKeys) {
-		const box = el.createDiv({ cls: "md2pdf-font-preview" });
-		const family = findBundledFamily(value);
-
-		if (!family) {
-			this.previewLine(box, "Regular", resolveFontCss(value), "normal", 400, sizePt);
-			return;
-		}
-
-		const status = box.createDiv({ cls: "md2pdf-font-preview-status", text: "Loading faces…" });
-		loadPreviewFont(this.app.vault.adapter, this.plugin.manifest.dir ?? "", family)
-			.then(() => {
-				status.remove();
-				for (const face of family.faces) {
-					const radio = faceKeys
-						? { name: `md2pdf-${faceKeys.weight}`, weight: face.weight, italic: face.italic, keys: faceKeys }
-						: undefined;
-					this.previewLine(
-						box,
-						faceLabel(face),
-						resolveFontCss(value),
-						face.italic ? "italic" : "normal",
-						face.weight,
-						sizePt,
-						radio,
-					);
-				}
-			})
-			.catch((err) => {
-				console.error("[md-to-pdf] font preview failed", err);
-				status.setText("Preview unavailable. The font file could not be read.");
-			});
-	}
-
-	private previewLine(
-		box: HTMLElement,
-		label: string,
-		family: string,
-		style: string,
-		weight: number,
-		sizePt: number,
-		radio?: { name: string; weight: number; italic: boolean; keys: FaceKeys },
-	) {
-		const row = box.createDiv({ cls: "md2pdf-font-preview-row" });
-		if (radio) {
-			const { weight: wKey, italic: iKey } = radio.keys;
-			const input = row.createEl("input", { attr: { type: "radio", name: radio.name } });
-			input.checked = this.plugin.settings[wKey] === radio.weight && this.plugin.settings[iKey] === radio.italic;
-			input.addEventListener("change", async () => {
-				if (!input.checked) return;
-				this.plugin.settings[wKey] = radio.weight;
-				this.plugin.settings[iKey] = radio.italic;
-				await this.plugin.saveSettings();
-			});
-		}
-		row.createSpan({ cls: "md2pdf-font-preview-label", text: label });
-		const sample = row.createSpan({ cls: "md2pdf-font-preview-sample", text: "The quick brown fox jumps over the lazy dog." });
-		sample.style.fontFamily = family;
-		sample.style.fontStyle = style;
-		sample.style.fontWeight = String(weight);
-		sample.style.fontSize = `${sizePt}pt`;
-	}
-
 	/**
 	 * One heading level: an own-font switch, the level's font (when the switch is on), weight, italic,
 	 * and size. H1 also gets the new-page toggle on its size row.
 	 */
 	/** Space before and after one heading level. */
-	private headingSpacing(el: HTMLElement, level: string, prefix: "h1" | "h2" | "h3") {
-		const base = this.plugin.settings.bodySizePt;
-		this.lengthSetting(el, `${level} space before`, `${prefix}SpaceBeforeEm` as NumberKey, `${prefix}SpaceBeforeUnit` as UnitKey, SPACING_UNITS, base);
-		this.lengthSetting(el, `${level} space after`, `${prefix}SpaceAfterEm` as NumberKey, `${prefix}SpaceAfterUnit` as UnitKey, SPACING_UNITS, base);
-	}
-
-	private headingLevel(
-		el: HTMLElement,
-		level: string,
-		fontKey: TextKey,
-		sizeKey: NumberKey,
-		overrideKey: BoolKey,
-		faceKeys: FaceKeys,
-		withPageBreak = false,
-	) {
-		new Setting(el).setName(`${level}`).setDesc("Uses its own font instead of the heading font.").addToggle((t) =>
-			t.setValue(this.plugin.settings[overrideKey]).onChange(async (v) => {
-				this.plugin.settings[overrideKey] = v;
-				await this.plugin.saveSettings();
-				this.refresh();
-			}),
-		);
-		if (this.plugin.settings[overrideKey]) {
-			this.fontSetting(el, `${level} font`, fontKey, this.plugin.settings[sizeKey], faceKeys);
-		} else {
-			this.fontPreview(el, this.plugin.settings.headingFont, this.plugin.settings[sizeKey], faceKeys);
-		}
-		this.weightSetting(el, `${level} weight`, fontKey, overrideKey, faceKeys.weight, faceKeys.italic);
-		const row = this.lengthSetting(el, `${level} size`, sizeKey, UNIT_KEY_FOR_SIZE[sizeKey], ABSOLUTE_UNITS, this.plugin.settings[sizeKey]);
-		if (withPageBreak) {
-			row.addToggle((t) =>
-				t
-					.setTooltip(`Start each ${level} on a new page`)
-					.setValue(this.plugin.settings.pageBreakBeforeH1)
-					.onChange(async (v) => {
-						this.plugin.settings.pageBreakBeforeH1 = v;
-						await this.plugin.saveSettings();
-					}),
-			);
-		}
-	}
-
 	/**
 	 * Weight dropdown for a text role. Bundled families choose their weight with radio buttons in the
 	 * font preview instead, so this only handles system fonts.
 	 */
-	private weightSetting(
-		el: HTMLElement,
-		name: string,
-		fontKey: TextKey,
-		overrideKey: BoolKey | null,
-		weightKey: WeightKey,
-		italicKey: ItalicKey,
-	) {
-		const fontValue = overrideKey && !this.plugin.settings[overrideKey] ? this.plugin.settings.headingFont : this.plugin.settings[fontKey];
-		if (findBundledFamily(fontValue)) return;
-
-		const current = this.plugin.settings[weightKey];
-		const options: Array<[number, string]> = [...SYSTEM_WEIGHTS];
-		if (!options.some(([w]) => w === current)) options.push([current, `Weight ${current}`]);
-
-		new Setting(el).setName(name).addDropdown((d) => {
-			for (const [w, label] of options) d.addOption(String(w), label);
-			d.setValue(String(current)).onChange(async (v) => {
-				this.plugin.settings[weightKey] = parseInt(v, 10);
-				await this.plugin.saveSettings();
-			});
-		});
-		new Setting(el).setName(name.replace(/ weight$/, "") + " italic").addToggle((t) =>
-			t.setValue(this.plugin.settings[italicKey]).onChange(async (v) => {
-				this.plugin.settings[italicKey] = v;
-				await this.plugin.saveSettings();
-			}),
-		);
-	}
-
 	private textSetting(el: HTMLElement, name: string, key: TextKey) {
 		new Setting(el).setName(name).addText((t) =>
 			t.setValue(this.plugin.settings[key]).onChange(async (v) => {
@@ -830,49 +610,6 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 	}
 
 	/** Line height value with a dropdown for its unit (em multiplier or pt). */
-	private lineHeightSetting(
-		el: HTMLElement,
-		name: string,
-		valueKey: "bodyLineHeight" | "headingLineHeight",
-		unitKey: "bodyLineHeightUnit" | "headingLineHeightUnit",
-	) {
-		const s = this.plugin.settings;
-		const setting = new Setting(el).setName(name);
-		const hint = setting.descEl;
-		const refreshHint = () => {
-			if (!s.baselineGridEnabled) {
-				hint.setText("Set exactly in the chosen unit. Baseline grid is off.");
-				return;
-			}
-			const fontPt = valueKey === "bodyLineHeight" ? s.bodySizePt : s.h2SizePt;
-			const units = snappedLineHeightUnits(s[valueKey], s[unitKey], fontPt, s.baselineGridPt);
-			const pt = units * s.baselineGridPt;
-			hint.setText(`Baseline grid on: snaps to ${units} grid unit${units === 1 ? "" : "s"} (${pt} pt).`);
-		};
-		setting
-			.addText((t) =>
-				t.setValue(String(s[valueKey])).onChange(async (v) => {
-					const n = parseFloat(v);
-					if (!Number.isNaN(n) && n > 0) {
-						s[valueKey] = n;
-						await this.plugin.saveSettings();
-						refreshHint();
-					}
-				}),
-			)
-			.addDropdown((d) =>
-				d
-					.addOptions({ em: "em", pt: "pt" })
-					.setValue(s[unitKey])
-					.onChange(async (v) => {
-						s[unitKey] = v as LineHeightUnit;
-						await this.plugin.saveSettings();
-						refreshHint();
-					}),
-			);
-		refreshHint();
-	}
-
 	/**
 	 * A length field with a unit dropdown. The value is stored in its canonical unit (pt or em)
 	 * and shown in the selected unit. Converting an em value to an absolute unit needs the font

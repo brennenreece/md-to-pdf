@@ -21,22 +21,24 @@ TeX Gyre Chorus is not bundled because the archive only includes its medium ital
 
 Set page margins in mm, cm, inches, points, or picas with the **Margin unit** dropdown. Values are stored in mm, so changing the unit only changes how they are shown.
 
-Font sizes, the baseline grid unit, and paragraph spacing each have a value and a unit dropdown. H1, H2, and H3 each have their own space before and space after, and H4–H6 share one pair. Each heading level's spacing has its own value and unit dropdown. Spacing can be given in **em**, **pt**, **pc**, **in**, **cm**, or **mm**. Font sizes and the grid use absolute units. Values are converted to the stored unit when saved, so changing the dropdown does not change the output.
+Font sizes, the baseline grid unit, and paragraph spacing each have a value and a unit dropdown. Spacing can be given in **em**, **pt**, **pc**, **in**, **cm**, or **mm**. Font sizes and the grid use absolute units. Values are converted to the stored unit when saved, so changing the dropdown does not change the output.
 
-Line height for body text and headings is set with a value and a unit dropdown (**em** multiplies the font size, **pt** is an absolute size). Heading line height defaults to 1 em. Use it to tighten or loosen multi-line headings.
+### Paragraph styles
 
-Choose a font from the grouped dropdown. Headings and body text each have their own weight and italic settings. For bundled families, pick the variation with the radio button beside its preview. Previews are drawn at the chosen point size.
+The **Paragraph styles** section works like InDesign's Paragraph Styles panel. It lists the built-in styles: Body, H1–H6, Block quote, List item, Code block, and Inline code. Click a style to edit it. Notes stay plain Markdown, so the set of styles is fixed.
 
-### Typography
+Each style has a **Based on** dropdown. A style uses the values of its base for any property it does not override. An overridden value shows a reset icon. Inherited values show "Inherited from" with the name of the base style. **Reset all to based-on style** clears every override for the selected style.
 
-The **Typography** section in settings controls:
+Each style has these settings:
 
-- **Pretty line wrapping** (`text-wrap: pretty`) avoids short last lines in paragraphs and list items. On by default.
-- **Hyphenation**, with a language for the hyphenation dictionary (for example `en-US`, `de`, or `fr`). Off by default.
-- **Justified text**. Off by default.
-- **Ligatures**. On by default. Turning them off disables `liga`, `clig`, and `dlig`.
-- **Oldstyle figures** (`onum`), if the font supports them.
-- **Small caps headings** (headings are set in small caps, with balanced line breaks).
+- **Character**: font, weight, italic, size, small caps, oldstyle figures, and ligatures.
+- **Paragraph**: alignment (left, center, right, or justify), text wrap (`text-wrap: pretty` or `balance`), hyphenation, and page break before.
+- **Spacing**: line height, space before, and space after. Each has a value and a unit dropdown.
+
+Choose a font from the grouped dropdown. Bundled families have a variation picker beside the preview. Previews are drawn at the chosen point size.
+
+The baseline grid and the hyphenation language apply to the whole document. They are in the same section.
+
 - **Baseline grid**. When enabled, body and heading line heights are whole multiples of the grid unit (in pt), block spacing snaps to half units, and each block's first baseline is moved onto a grid line. The first line of every page (including pages that start after a page break or `---` rule) has its cap height on the top margin, or on the first grid line below it when the grid is on. Layout is measured in the printed column width, so line breaks match the PDF.
 - **Overflow page breaks**. A block whose first line would fall past the bottom margin moves to the next page, as if it had a forced break.
 - **Known gap**: a paragraph split across pages does not yet align its continuation line to the top margin. The continuation starts a few points below the margin. Whole blocks that move to a new page are aligned correctly.
@@ -45,7 +47,7 @@ Hyphenation and justification are applied by Chromium's print engine, so they sh
 
 ### Themes
 
-Use **Save current style as theme** to store the page, margin, font, heading weight and italic, code, and header/footer settings under a name. Load, delete, or reset from the Themes section. Themes are stored in the plugin's data file.
+Use **Save current style as theme** to store the page, margin, paragraph style, and header/footer settings under a name. Load, delete, or reset from the Themes section. Themes are stored in the plugin's data file.
 
 ### PDF preview
 

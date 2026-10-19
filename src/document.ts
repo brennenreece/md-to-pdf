@@ -1,6 +1,6 @@
 import type { Alignment, MdToPdfSettings } from "./settings";
 import { findBundledFamily, resolveFontCss } from "./fonts";
-import { stylesFromFlatSettings } from "./paragraph-styles";
+import type { ParagraphStyles } from "./paragraph-styles";
 import { styleCss } from "./style-css";
 
 const PAGE_MM: Record<string, [number, number]> = {
@@ -45,8 +45,7 @@ export function snappedLineHeightUnits(
 
 /**
 /** Styles for the print content (the .md2pdf-root tree). Shared with the settings preview. */
-export function contentCss(s: MdToPdfSettings): string {
-	const styles = stylesFromFlatSettings(s);
+export function contentCss(s: MdToPdfSettings, styles: ParagraphStyles): string {
 	return `${styleCss(styles, {
 		baselineGridEnabled: s.baselineGridEnabled,
 		baselineGridPt: s.baselineGridPt,
@@ -283,6 +282,7 @@ export function buildDocumentHtml(opts: {
 	appCss: string;
 	fontFaceCss: string;
 	settings: MdToPdfSettings;
+	styles: ParagraphStyles;
 	/** Preview-only: draws the baseline grid over the page. */
 	showBaselineGrid?: boolean;
 	/** Preview-only: draws a magenta frame at the margin edges. */
@@ -320,7 +320,7 @@ html, body {
 	margin: 0 !important;
 	padding: 0 !important;
 }
-${contentCss(s)}`;
+${contentCss(s, opts.styles)}`;
 
 const hideUiElements = `
 /* Ensure nothing is hidden in the print context. SVG hit-test rects (opacity="0") stay transparent. */

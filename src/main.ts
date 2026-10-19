@@ -119,7 +119,7 @@ export default class MdToPdfPlugin extends Plugin {
 			const fontFaceCss = await buildBundledFontFaces(
 				this.app.vault.adapter,
 				this.manifest.dir ?? "",
-				fontKeysInUse(settings),
+				fontKeysInUse(this.styles),
 			);
 			return buildDocumentHtml({
 				title: file.basename,
@@ -127,6 +127,7 @@ export default class MdToPdfPlugin extends Plugin {
 				appCss: collectAppCss() + "\n" + (await collectThemeCss(this.app)),
 				fontFaceCss,
 				settings,
+				styles: this.styles,
 				showBaselineGrid: opts.showBaselineGrid,
 				showMargins: opts.showMargins,
 			});

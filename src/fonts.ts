@@ -1,3 +1,5 @@
+import { STYLE_ORDER, resolveStyle, type ParagraphStyles } from "./paragraph-styles";
+
 /**
  * Bundled font families. Font files live in assets/fonts/ and are read from the plugin folder at
  * export time. Only the families a note actually uses are embedded in the PDF.
@@ -198,22 +200,10 @@ export function resolveFontCss(value: string): string {
 }
 
 /** Keys for every font a document uses, so only those families are embedded. */
-export function fontKeysInUse(s: {
-	bodyFont: string;
-	headingFont: string;
-	h1Font: string;
-	h2Font: string;
-	h3Font: string;
-	h1OverrideFont: boolean;
-	h2OverrideFont: boolean;
-	h3OverrideFont: boolean;
-	codeFont: string;
-}): string[] {
-	const keys = [s.bodyFont, s.headingFont, s.codeFont];
-	if (s.h1OverrideFont) keys.push(s.h1Font);
-	if (s.h2OverrideFont) keys.push(s.h2Font);
-	if (s.h3OverrideFont) keys.push(s.h3Font);
-	return keys;
+export function fontKeysInUse(styles: ParagraphStyles): string[] {
+	const keys = new Set<string>();
+	for (const id of STYLE_ORDER) keys.add(resolveStyle(styles, id).props.font);
+	return [...keys];
 }
 
 /** Human-readable label for a face, used under the font preview: "Regular", "Bold Italic", "Light". */

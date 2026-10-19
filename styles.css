@@ -102,3 +102,46 @@
 	min-height: 0;
 	border: 0;
 }
+
+/* Paragraph styles editor */
+.md2pdf-style-list {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	margin-bottom: 12px;
+	overflow: hidden;
+}
+.md2pdf-style-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 12px;
+	padding: 6px 10px;
+	cursor: pointer;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.md2pdf-style-row:last-child {
+	border-bottom: none;
+}
+.md2pdf-style-row:hover {
+	background: var(--background-modifier-hover);
+}
+.md2pdf-style-row.is-selected {
+	background: var(--background-modifier-active-hover);
+	font-weight: 600;
+}
+.md2pdf-style-name {
+	flex: 0 0 auto;
+}
+.md2pdf-style-summary {
+	color: var(--text-muted);
+	font-size: var(--font-smaller);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.md2pdf-inherited .setting-item-description {
+	color: var(--text-faint);
+	font-style: italic;
+}

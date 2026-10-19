@@ -1,18 +1,22 @@
 import type { MdToPdfSettings } from "./settings";
+import { stylesFromFlatSettings, type ParagraphStyles } from "./paragraph-styles";
 
 /**
  * A theme is a named snapshot of the style settings. Page size and orientation, margins, and
  * header/footer text are file-independent styling, so they are included. The saved theme list
  * is stored separately from the settings.
  */
-export type ThemeData = MdToPdfSettings;
+export interface ThemeData extends MdToPdfSettings {
+	/** Paragraph styles. Themes saved before styles existed have none and are converted on apply. */
+	styles?: ParagraphStyles;
+}
 
 export interface SavedTheme {
 	name: string;
 	settings: ThemeData;
 }
 
-export const THEME_KEYS: Array<keyof ThemeData> = [
+export const THEME_KEYS: Array<keyof MdToPdfSettings> = [
 	"pageSize",
 	"orientation",
 	"marginTopMm",
@@ -89,16 +93,20 @@ export const THEME_KEYS: Array<keyof ThemeData> = [
 	"pageNumberAlign",
 ];
 
-/** Copies the style fields of settings into a new theme object. */
-export function snapshotTheme(s: MdToPdfSettings): ThemeData {
-	const out: Partial<Record<keyof ThemeData, unknown>> = {};
-	for (const key of THEME_KEYS) out[key] = s[key];
-	return out as ThemeData;
+/** Copies the style fields and paragraph styles into a new theme object. */
+export function snapshotTheme(s: MdToPdfSettings, styles: ParagraphStyles): ThemeData {
+	const out: Partial<Record<keyof MdToPdfSettings, unknown>> = {};
+	for (const key of THEME_KEYS) (out as Record<string, unknown>)[key] = s[key as keyof MdToPdfSettings];
+	return { ...(out as MdToPdfSettings), styles: structuredClone(styles) };
 }
 
-/** Applies a theme's values onto settings, leaving unknown keys untouched. */
-export function applyTheme(s: MdToPdfSettings, theme: ThemeData): void {
+/**
+ * Applies a theme onto settings and returns the paragraph styles it carries. Themes saved
+ * before styles existed have none, so their flat values are converted.
+ */
+export function applyTheme(s: MdToPdfSettings, theme: ThemeData): ParagraphStyles {
 	for (const key of THEME_KEYS) {
 		if (key in theme) (s as unknown as Record<string, unknown>)[key] = theme[key];
 	}
+	return structuredClone(theme.styles ?? stylesFromFlatSettings(s));
 }
