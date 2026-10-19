@@ -4,6 +4,7 @@ import { renderNoteToHtml, collectAppCss, collectThemeCss } from "./render";
 import { buildDocumentHtml } from "./document";
 import { buildBundledFontFaces, fontKeysInUse } from "./fonts";
 import type { SavedTheme } from "./themes";
+import { DEFAULT_PARAGRAPH_STYLES, ParagraphStyles, stylesFromFlatSettings } from "./paragraph-styles";
 import { printHtmlToPdf } from "./pdf";
 import { PdfPreviewView, PREVIEW_VIEW_TYPE } from "./preview-view";
 
@@ -12,6 +13,8 @@ const FRONTMATTER_RE = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/;
 export default class MdToPdfPlugin extends Plugin {
 	settings: MdToPdfSettings = DEFAULT_SETTINGS;
 	themes: SavedTheme[] = [];
+	/** Paragraph styles. Built from the flat settings the first time they are loaded. */
+	styles: ParagraphStyles = DEFAULT_PARAGRAPH_STYLES;
 
 	async onload() {
 		await this.loadSettings();
@@ -80,13 +83,15 @@ export default class MdToPdfPlugin extends Plugin {
 
 	async loadSettings() {
 		const saved = (await this.loadData()) ?? {};
-		const { themes, ...rest } = saved;
+		const { themes, styles, ...rest } = saved;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, rest);
 		this.themes = Array.isArray(themes) ? themes : [];
+		// Older versions only saved flat keys. Build the styles from them once.
+		this.styles = styles ?? stylesFromFlatSettings(this.settings);
 	}
 
 	async saveSettings() {
-		await this.saveData({ ...this.settings, themes: this.themes });
+		await this.saveData({ ...this.settings, themes: this.themes, styles: this.styles });
 		this.refreshPreviewAfterSettingsChange();
 	}
 

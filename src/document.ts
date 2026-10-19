@@ -1,5 +1,7 @@
 import type { Alignment, MdToPdfSettings } from "./settings";
 import { findBundledFamily, resolveFontCss } from "./fonts";
+import { stylesFromFlatSettings } from "./paragraph-styles";
+import { styleCss } from "./style-css";
 
 const PAGE_MM: Record<string, [number, number]> = {
 	A4: [210, 297],
@@ -28,23 +30,6 @@ export function pageSizeCss(s: MdToPdfSettings): string {
 }
 
 /**
- * CSS value for a line height. Grid mode pins it to a whole number of grid units so every
- * line box, and so every baseline inside it, lands on the grid. Otherwise the user's value
- * is used in its chosen unit (em multiplier or pt).
- */
-export function lineHeightValue(
-	value: number,
-	unit: "em" | "pt",
-	fontPt: number,
-	s: MdToPdfSettings,
-): string {
-	if (s.baselineGridEnabled) {
-		return `calc(var(--md2pdf-baseline) * ${snappedLineHeightUnits(value, unit, fontPt, s.baselineGridPt)})`;
-	}
-	return unit === "pt" ? `${value}pt` : `${value}em`;
-}
-
-/**
  * Number of grid units a line height snaps to when the baseline grid is on. Shared with the
  * settings UI so the hint shown to the user matches what the print output uses.
  */
@@ -59,134 +44,13 @@ export function snappedLineHeightUnits(
 }
 
 /**
- * Typography rules: line breaking, hyphenation, justification, OpenType features, and an
- * optional baseline grid. Kept separate so the grid rules can be read on their own.
- */
-/**
- * Margin rules for each heading level. H1 to H3 use their own values. H4 to H6 share the
- * general heading values. `toCss` turns an em value into a CSS length.
- */
-function headingSpaceRules(s: MdToPdfSettings, toCss: (em: number) => string): string {
-	const levelRule = (sel: string, before: number, after: number) =>
-		`${sel} { margin-top: ${toCss(before)} !important; margin-bottom: ${toCss(after)} !important; }`;
-	return [
-		levelRule(".md2pdf-root h1", s.h1SpaceBeforeEm, s.h1SpaceAfterEm),
-		levelRule(".md2pdf-root h2", s.h2SpaceBeforeEm, s.h2SpaceAfterEm),
-		levelRule(".md2pdf-root h3", s.h3SpaceBeforeEm, s.h3SpaceAfterEm),
-		levelRule(".md2pdf-root h4, .md2pdf-root h5, .md2pdf-root h6", s.headingSpaceBeforeEm, s.headingSpaceAfterEm),
-	].join("\n");
-}
-
-export function typographyCss(s: MdToPdfSettings): string {
-	// Ligature and figure choices go through font-feature-settings so one rule owns them.
-	const features: string[] = [];
-	if (!s.ligatures) features.push('"liga" 0', '"clig" 0', '"dlig" 0');
-	if (s.oldstyleFigures) features.push('"onum" 1');
-	const featureRule = features.length ? `font-feature-settings: ${features.join(", ")} !important;` : "";
-	const capsRule = s.smallCapsHeadings ? "font-variant-caps: all-small-caps !important;" : "";
-	const hyphenRule = s.hyphenation
-		? "hyphens: auto !important;\n\t-webkit-hyphens: auto !important;"
-		: "";
-	const alignRule = s.justify ? "text-align: justify !important;" : "";
-	// Avoids short last lines and one-word orphans in body text.
-	const prettyRule = ".md2pdf-root p, .md2pdf-root li, .md2pdf-root blockquote { text-wrap: pretty; }";
-
-	// Spacing snaps to whole or half baseline units. Half units keep headings close to their
-	// requested em spacing while still landing on the grid.
-	const halfUnits = (em: number) => Math.max(0, Math.round(em * 2)) / 2;
-	const gridVar = s.baselineGridEnabled ? `--md2pdf-baseline: ${s.baselineGridPt}pt;` : "";
-	const gridRules = s.baselineGridEnabled
-		? `
-.md2pdf-root p,
-.md2pdf-root ul,
-.md2pdf-root ol,
-.md2pdf-root blockquote,
-.md2pdf-root table,
-.md2pdf-root pre {
-	margin-bottom: calc(var(--md2pdf-baseline) * ${halfUnits(s.paragraphSpacingEm)}) !important;
-}
-${headingSpaceRules(s, (em) => `calc(var(--md2pdf-baseline) * ${halfUnits(em)})`)}`
-		: "";
-
-	return `.md2pdf-root {
-	${gridVar}
-	${hyphenRule}
-	${alignRule}
-	${featureRule}
-	orphans: 2;
-	widows: 2;
-}
-${prettyRule}
-.md2pdf-root p,
-.md2pdf-root li,
-.md2pdf-root blockquote {
-	text-wrap: ${s.textWrapPretty ? "pretty" : "wrap"};
-}
-.md2pdf-root h1,
-.md2pdf-root h2,
-.md2pdf-root h3,
-.md2pdf-root h4,
-.md2pdf-root h5,
-.md2pdf-root h6 {
-	text-wrap: balance;
-	${capsRule}
-}${gridRules}
-`;
-}
-
 /** Styles for the print content (the .md2pdf-root tree). Shared with the settings preview. */
 export function contentCss(s: MdToPdfSettings): string {
-	return `.md2pdf-root {
-	font-family: ${resolveFontCss(s.bodyFont)} !important;
-	font-weight: ${s.bodyWeight};
-	font-style: ${s.bodyItalic ? "italic" : "normal"};
-	font-size: ${s.bodySizePt}pt !important;
-	line-height: ${lineHeightValue(s.bodyLineHeight, s.bodyLineHeightUnit, s.bodySizePt, s)} !important;
-	color: #111 !important;
-	width: 100%;
-	max-width: none;
-	padding: 0;
-	/* Stops the first heading's negative margin from collapsing out, which would shift the grid origin. */
-	display: flow-root;
-	margin: 0;
-	background: white;
-}
-${typographyCss(s)}
-.md2pdf-root p,
-.md2pdf-root ul,
-.md2pdf-root ol,
-.md2pdf-root blockquote,
-.md2pdf-root table,
-.md2pdf-root pre {
-	margin: 0 0 ${s.paragraphSpacingEm}em 0 !important;
-	text-indent: 0 !important;
-}
-.md2pdf-root * { text-indent: 0 !important; }
-.md2pdf-root h1,
-.md2pdf-root h2,
-.md2pdf-root h3,
-.md2pdf-root h4,
-.md2pdf-root h5,
-.md2pdf-root h6 {
-	color: #000 !important;
-	break-after: avoid !important;
-	page-break-after: avoid !important;
-}
-.md2pdf-root h1 { line-height: ${lineHeightValue(s.headingLineHeight, s.headingLineHeightUnit, s.h1SizePt, s)} !important; font-family: ${s.h1OverrideFont ? resolveFontCss(s.h1Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h1SizePt}pt !important; font-weight: ${s.h1Weight} !important; font-style: ${s.h1Italic ? "italic" : "normal"} !important; }
-.md2pdf-root h2 { line-height: ${lineHeightValue(s.headingLineHeight, s.headingLineHeightUnit, s.h2SizePt, s)} !important; font-family: ${s.h2OverrideFont ? resolveFontCss(s.h2Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h2SizePt}pt !important; font-weight: ${s.h2Weight} !important; font-style: ${s.h2Italic ? "italic" : "normal"} !important; }
-.md2pdf-root h3 { line-height: ${lineHeightValue(s.headingLineHeight, s.headingLineHeightUnit, s.h3SizePt, s)} !important; font-family: ${s.h3OverrideFont ? resolveFontCss(s.h3Font) : resolveFontCss(s.headingFont)} !important; font-size: ${s.h3SizePt}pt !important; font-weight: ${s.h3Weight} !important; font-style: ${s.h3Italic ? "italic" : "normal"} !important; }
-${headingSpaceRules(s, (em) => `${em}em`)}
-.md2pdf-root h1:first-child { margin-top: 0 !important; }
-${
-	s.pageBreakBeforeH1
-		? ".md2pdf-root h1:not(:first-child) { break-before: page !important; page-break-before: always !important; }"
-		: ""
-}
-.md2pdf-root pre,
-.md2pdf-root code {
-	font-family: ${resolveFontCss(s.codeFont)} !important;
-	font-size: ${s.codeSizePt}pt !important;
-}
+	const styles = stylesFromFlatSettings(s);
+	return `${styleCss(styles, {
+		baselineGridEnabled: s.baselineGridEnabled,
+		baselineGridPt: s.baselineGridPt,
+	})}
 .md2pdf-root pre,
 .md2pdf-root table,
 .md2pdf-root blockquote,
