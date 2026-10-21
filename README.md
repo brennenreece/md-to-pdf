@@ -32,7 +32,7 @@ Each style has a **Based on** dropdown. A style uses the values of its base for 
 Each style has these settings. Each group folds open and closed, and all groups start folded:
 
 - **Character**: size, font, style (the faces the typeface ships), small caps, all caps, ligatures, and oldstyle figures (checkboxes).
-- **Paragraph**: alignment (left, center, right, or justify), text wrap (`text-wrap: pretty` or `balance`), hyphenation, and page break before. Page break before works on any block style (body text, headings, blockquotes, list items, and code blocks); inline code cannot take one.
+- **Paragraph**: alignment (left, center, right, or justify), text wrap (`text-wrap: pretty` or `balance`), hyphenation, justify between characters (`text-justify: inter-character`, which needs Chromium 145 or later), and page break before. Page break before works on any block style (body text, headings, blockquotes, list items, and code blocks); inline code cannot take one.
 - **Spacing**: line height, space before, and space after. Each has a value and a unit dropdown.
 
 The font field opens a menu grouped into System fonts, TeX Gyre, and League of Moveable Type. Each entry is drawn in its own font with a sample line, so you can compare fonts before picking one. Bundled fonts load when the menu opens.
@@ -44,6 +44,27 @@ The baseline grid and the hyphenation language apply to the whole document. They
 - **Known gap**: a paragraph split across pages does not yet align its continuation line to the top margin. The continuation starts a few points below the margin. Whole blocks that move to a new page are aligned correctly.
 
 Hyphenation and justification are applied by Chromium's print engine, so they show in exported PDFs.
+
+### Non-breaking spaces
+
+Turn on **Non-breaking spaces** to keep short words, numbers, and section marks attached to the next word, so "§ 4", "12 pt", and "Fig. 3" don't split across lines. This uses [typograf](https://github.com/typograf/typograf) with only its non-breaking-space rules. Text in code, links, and math is left alone.
+
+### Blank lines
+
+Put `<linespace N unit>` on its own line to add an empty space of that height, for example `<linespace 2 em>` or `<linespace 0.5 in>`. Angle brackets are used because square brackets become links in Obsidian. Units are em, in, pt, pc, cm, or mm. The space shows in both the preview and the PDF. Lines inside code blocks are not changed.
+
+### Tables
+
+The **Table** section sets fills and rules for the whole table:
+
+- **Header row**: fill, text color, bold, and a rule under the header.
+- **Body rows**: fill, an alternate-row (zebra) fill, and a rule between rows.
+- **Columns**: a vertical rule between columns.
+- **Grid**: the outer border, cell padding (vertical and horizontal), and a **Full width** option that stretches the table across the text width within the margins with equal columns.
+
+Space before and after a table is set with **Space before table** and **Space after table**, each with a unit dropdown. These are the same values as the Table paragraph style.
+
+Rule widths are in pt, where 0 turns the rule off. Clear a color with its reset button to fall back to the default. Table text uses the Table paragraph style.
 
 ### Themes
 

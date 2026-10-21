@@ -1,5 +1,6 @@
 import { resolveFontCss, shippedWeight } from "./fonts";
-import { resolveStyle, type ParagraphStyles, type StyleId, type StyleProps } from "./paragraph-styles";
+import type { LengthUnit } from "./length";
+import { DEFAULT_TABLE_STYLE, resolveStyle, type ParagraphStyles, type StyleId, type StyleProps, type TableStyle } from "./paragraph-styles";
 
 /** Page-level options that are not part of any paragraph style. */
 export interface StyleCssOptions {
@@ -85,9 +86,9 @@ export function lineHeightCss(
 	return unit === "pt" ? `${value}pt` : `${value}em`;
 }
 
-/** Spacing in em. On the grid it snaps to half units, which keeps headings near their request. */
-function spacingCss(em: number): string {
-	return `${em}em`;
+/** A spacing value in its own unit, as CSS. */
+function spacingCss(value: number, unit: LengthUnit): string {
+	return `${value}${unit}`;
 }
 
 /** Declarations for the properties that every style can set. */
@@ -107,11 +108,59 @@ function declarations(props: StyleProps, grid: { enabled: boolean; pt: number },
 		`text-wrap: ${props.textWrap};`,
 		`hyphens: ${props.hyphenation ? "auto" : "manual"};`,
 		`-webkit-hyphens: ${props.hyphenation ? "auto" : "manual"};`,
+		`text-justify: ${props.align === "justify" && props.interCharacterJustify ? "inter-character" : "auto"};`,
 		`font-variant-caps: ${props.smallCaps && !props.allCaps ? "all-small-caps" : "normal"};`,
 	];
 	if (props.allCaps) lines.push("text-transform: uppercase;");
 	if (features.length) lines.push(`font-feature-settings: ${features.join(", ")};`);
 	return lines.map((l) => `\t${l}`).join("\n");
+}
+
+/**
+ * Fills and rules for tables. Only values that differ from the defaults are written, so an
+ * unchanged table keeps the output it had before these options existed.
+ */
+function tableCss(t: TableStyle, font: StyleProps): string[] {
+	const d = DEFAULT_TABLE_STYLE;
+	const out: string[] = [];
+	const rule = (pt: number, color: string) => `${pt}pt solid ${color}`;
+	const cell: string[] = [];
+	const header: string[] = [];
+	const body: string[] = [];
+
+	if (t.cellPaddingVEm !== d.cellPaddingVEm || t.cellPaddingHEm !== d.cellPaddingHEm) {
+		cell.push(`padding: ${t.cellPaddingVEm}em ${t.cellPaddingHEm}em !important;`);
+	}
+	if (t.columnRulePt !== d.columnRulePt || t.columnRuleColor !== d.columnRuleColor) {
+		cell.push(`border-left: ${t.columnRulePt > 0 ? rule(t.columnRulePt, t.columnRuleColor) : "none"} !important;`);
+		cell.push(`border-right: ${t.columnRulePt > 0 ? rule(t.columnRulePt, t.columnRuleColor) : "none"} !important;`);
+	}
+	if (t.rowRulePt !== d.rowRulePt || t.rowRuleColor !== d.rowRuleColor) {
+		body.push(`border-bottom: ${t.rowRulePt > 0 ? rule(t.rowRulePt, t.rowRuleColor) : "none"} !important;`);
+	}
+	if (t.headerFill) header.push(`background-color: ${t.headerFill} !important;`);
+	if (t.headerText) header.push(`color: ${t.headerText} !important;`);
+	if (t.headerBold !== d.headerBold) {
+		const w = shippedWeight(font.font, t.headerBold ? 700 : 400, font.italic);
+		header.push(`font-weight: ${w} !important;`);
+	}
+	if (t.headerRulePt !== d.headerRulePt || t.headerRuleColor !== d.headerRuleColor) {
+		header.push(`border-bottom: ${t.headerRulePt > 0 ? rule(t.headerRulePt, t.headerRuleColor) : "none"} !important;`);
+	}
+	if (t.bodyFill) body.push(`background-color: ${t.bodyFill} !important;`);
+	// Cell rules only join up when the borders collapse. Otherwise Obsidian's cell spacing leaves gaps.
+	const anyRule = t.outerRulePt > 0 || t.columnRulePt > 0 || t.rowRulePt > 0 || t.headerRulePt > 0;
+	if (anyRule || t.outerRulePt !== d.outerRulePt || t.outerRuleColor !== d.outerRuleColor) {
+		out.push(`.md2pdf-root table {\n\tborder: ${t.outerRulePt > 0 ? rule(t.outerRulePt, t.outerRuleColor) : "none"} !important;\n\tborder-collapse: collapse !important;\n\tborder-spacing: 0 !important;\n}`);
+	}
+	if (t.fullWidth) {
+		out.push(`.md2pdf-root table {\n\twidth: 100% !important;\n\ttable-layout: fixed !important;\n}`);
+	}
+	if (cell.length) out.push(`.md2pdf-root th, .md2pdf-root td {\n${cell.map((l) => "\t" + l).join("\n")}\n}`);
+	if (header.length) out.push(`.md2pdf-root thead th, .md2pdf-root tr:first-child th {\n${header.map((l) => "\t" + l).join("\n")}\n}`);
+	if (body.length) out.push(`.md2pdf-root tbody td {\n${body.map((l) => "\t" + l).join("\n")}\n}`);
+	if (t.zebraFill) out.push(`.md2pdf-root tbody tr:nth-child(even) td {\n\tbackground-color: ${t.zebraFill} !important;\n}`);
+	return out;
 }
 
 /**
@@ -152,8 +201,8 @@ ${declarations(body, grid, true)}
 	color: #000 !important;
 	break-after: avoid !important;
 	page-break-after: avoid !important;
-	margin-top: ${spacingCss(props.spaceBeforeEm)} !important;
-	margin-bottom: ${spacingCss(props.spaceAfterEm)} !important;
+	margin-top: ${spacingCss(props.spaceBefore, props.spaceBeforeUnit)} !important;
+	margin-bottom: ${spacingCss(props.spaceAfter, props.spaceAfterUnit)} !important;
 }`);
 	}
 	parts.push(`.md2pdf-root h1:first-child { margin-top: 0 !important; }`);
@@ -181,13 +230,20 @@ ${declarations(body, grid, true)}
 		parts.push(`${SELECTORS[id]} {\n${declarations(props, grid, true)}\n}`);
 	}
 
+	parts.push(...tableCss(styles.tableStyle ?? DEFAULT_TABLE_STYLE, body));
+
+	// Space before and after a table comes from the Table paragraph style, which defaults to the body spacing.
+	const tableProps = resolveStyle(styles, "table").props;
+	parts.push(`.md2pdf-root table {
+	margin: ${spacingCss(tableProps.spaceBefore, tableProps.spaceBeforeUnit)} 0 ${spacingCss(tableProps.spaceAfter, tableProps.spaceAfterUnit)} 0 !important;
+}`);
+
 	// Paragraph and list spacing come from the body style, so they match the other rules.
-	const bodySpace = spacingCss(body.spaceAfterEm);
+	const bodySpace = spacingCss(body.spaceAfter, body.spaceAfterUnit);
 	parts.push(`.md2pdf-root p,
 .md2pdf-root ul,
 .md2pdf-root ol,
 .md2pdf-root blockquote,
-.md2pdf-root table,
 .md2pdf-root pre {
 	margin: 0 0 ${bodySpace} 0 !important;
 	text-indent: 0 !important;

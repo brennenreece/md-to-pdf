@@ -5,6 +5,8 @@
  * set of styles is fixed.
  */
 
+import type { LengthUnit } from "./length";
+
 export type StyleId =
 	| "body"
 	| "h1"
@@ -30,7 +32,7 @@ export type LineHeightUnit = "em" | "pt";
 export type TextAlign = "left" | "center" | "right" | "justify";
 export type TextWrap = "wrap" | "nowrap" | "pretty" | "balance";
 
-/** Every property a style can hold. Spacing is stored in em, sizes in pt. */
+/** Every property a style can hold. Sizes are stored in pt. Spacing is stored in its own unit. */
 export interface StyleProps {
 	font: string;
 	weight: number;
@@ -38,11 +40,17 @@ export interface StyleProps {
 	sizePt: number;
 	lineHeight: number;
 	lineHeightUnit: LineHeightUnit;
-	spaceBeforeEm: number;
-	spaceAfterEm: number;
+	/** Space above the element, in `spaceBeforeUnit`. */
+	spaceBefore: number;
+	spaceBeforeUnit: LengthUnit;
+	/** Space below the element, in `spaceAfterUnit`. */
+	spaceAfter: number;
+	spaceAfterUnit: LengthUnit;
 	align: TextAlign;
 	textWrap: TextWrap;
 	hyphenation: boolean;
+	/** Spread justified lines between characters as well as words (text-justify: inter-character). */
+	interCharacterJustify: boolean;
 	ligatures: boolean;
 	smallCaps: boolean;
 	allCaps: boolean;
@@ -62,7 +70,53 @@ export interface ParagraphStyle {
 	props: Partial<StyleProps>;
 }
 
-export type ParagraphStyles = Record<StyleId, ParagraphStyle>;
+export type ParagraphStyles = Record<StyleId, ParagraphStyle> & {
+	/** Table fills and rules. Optional so saved data from earlier versions still loads. */
+	tableStyle?: TableStyle;
+};
+
+/**
+ * Table appearance, kept beside the table paragraph style. A rule width of 0 means no rule.
+ * Colors are CSS hex strings. An empty fill means no background.
+ */
+export interface TableStyle {
+	headerFill: string;
+	headerText: string;
+	headerBold: boolean;
+	headerRulePt: number;
+	headerRuleColor: string;
+	bodyFill: string;
+	zebraFill: string;
+	rowRulePt: number;
+	rowRuleColor: string;
+	columnRulePt: number;
+	columnRuleColor: string;
+	outerRulePt: number;
+	outerRuleColor: string;
+	cellPaddingVEm: number;
+	cellPaddingHEm: number;
+	/** Stretch the table to the full text width with equal column widths. */
+	fullWidth: boolean;
+}
+
+export const DEFAULT_TABLE_STYLE: TableStyle = {
+	headerFill: "",
+	headerText: "",
+	headerBold: false,
+	headerRulePt: 0,
+	headerRuleColor: "#111111",
+	bodyFill: "",
+	zebraFill: "",
+	rowRulePt: 0,
+	rowRuleColor: "#cccccc",
+	columnRulePt: 0,
+	columnRuleColor: "#cccccc",
+	outerRulePt: 0,
+	outerRuleColor: "#111111",
+	cellPaddingVEm: 0,
+	cellPaddingHEm: 0,
+	fullWidth: false,
+};
 
 /** Display order and labels for the styles panel. */
 export const STYLE_ORDER: StyleId[] = [
@@ -117,11 +171,12 @@ const BODY_PROPS: StyleProps = {
 	sizePt: 11,
 	lineHeight: 1.5,
 	lineHeightUnit: "em",
-	spaceBeforeEm: 0,
-	spaceAfterEm: 0.8,
+	spaceBefore: 0, spaceBeforeUnit: "em",
+	spaceAfter: 0.8, spaceAfterUnit: "em",
 	align: "left",
 	textWrap: "pretty",
 	hyphenation: false,
+	interCharacterJustify: false,
 	ligatures: true,
 	smallCaps: false,
 	allCaps: false,
@@ -136,7 +191,7 @@ function heading(id: StyleId, name: string, props: Partial<StyleProps>): Paragra
 		id,
 		name,
 		basedOn: "body",
-		props: { font: HEADING_FONT, textWrap: "balance", spaceBeforeEm: 1.2, spaceAfterEm: 0.5, ...props },
+		props: { font: HEADING_FONT, textWrap: "balance", spaceBefore: 1.2, spaceBeforeUnit: "em", spaceAfter: 0.5, spaceAfterUnit: "em", ...props },
 	};
 }
 
@@ -147,7 +202,7 @@ function minorHeading(id: StyleId, name: string, sizeRatio: number): ParagraphSt
 		id,
 		name,
 		basedOn: "body",
-		props: { textWrap: "balance", spaceBeforeEm: 1.2, spaceAfterEm: 0.5, weight: 700, sizePt },
+		props: { textWrap: "balance", spaceBefore: 1.2, spaceBeforeUnit: "em", spaceAfter: 0.5, spaceAfterUnit: "em", weight: 700, sizePt },
 	};
 }
 
@@ -182,6 +237,7 @@ export const DEFAULT_PARAGRAPH_STYLES: ParagraphStyles = {
 	callout: { id: "callout", name: STYLE_NAMES.callout, basedOn: "body", props: {} },
 	image: { id: "image", name: STYLE_NAMES.image, basedOn: "body", props: {} },
 	footnote: { id: "footnote", name: STYLE_NAMES.footnote, basedOn: "body", props: {} },
+	tableStyle: { ...DEFAULT_TABLE_STYLE },
 };
 
 /**
@@ -191,9 +247,29 @@ export const DEFAULT_PARAGRAPH_STYLES: ParagraphStyles = {
 export function withMissingStyles(saved: Partial<ParagraphStyles> | undefined): ParagraphStyles {
 	const out = structuredClone(DEFAULT_PARAGRAPH_STYLES);
 	for (const id of STYLE_ORDER) {
-		if (saved?.[id]) out[id] = { ...out[id], ...saved[id], props: { ...saved[id]!.props } };
+		if (saved?.[id]) out[id] = { ...out[id], ...saved[id], props: migrateSpacing({ ...saved[id]!.props }) };
 	}
+	out.tableStyle = { ...DEFAULT_TABLE_STYLE, ...(saved?.tableStyle ?? {}) };
 	return out;
+}
+
+/**
+ * Saved styles before units existed stored spacing as `spaceBeforeEm` and `spaceAfterEm`.
+ * Those values are em, so they move to the unit-aware keys with the em unit.
+ */
+function migrateSpacing(props: Record<string, unknown>): Partial<StyleProps> {
+	const out = { ...props } as Record<string, unknown>;
+	if ("spaceBeforeEm" in out) {
+		out.spaceBefore ??= out.spaceBeforeEm;
+		out.spaceBeforeUnit ??= "em";
+		delete out.spaceBeforeEm;
+	}
+	if ("spaceAfterEm" in out) {
+		out.spaceAfter ??= out.spaceAfterEm;
+		out.spaceAfterUnit ??= "em";
+		delete out.spaceAfterEm;
+	}
+	return out as Partial<StyleProps>;
 }
 
 export class StyleCycleError extends Error {}
@@ -265,11 +341,13 @@ export function stylesFromFlatSettings(s: LegacyFlatSettings): ParagraphStyles {
 		sizePt: s.bodySizePt,
 		lineHeight: s.bodyLineHeight,
 		lineHeightUnit: s.bodyLineHeightUnit,
-		spaceBeforeEm: 0,
-		spaceAfterEm: s.paragraphSpacingEm,
+		spaceBefore: 0, spaceBeforeUnit: "em",
+		spaceAfter: s.paragraphSpacingEm,
+		spaceAfterUnit: s.paragraphSpacingUnit,
 		align: s.justify ? "justify" : "left",
 		textWrap: s.textWrapPretty ? "pretty" : "wrap",
 		hyphenation: s.hyphenation,
+		interCharacterJustify: s.interCharacterJustify,
 		ligatures: s.ligatures,
 		oldstyleFigures: s.oldstyleFigures,
 	});
@@ -282,8 +360,10 @@ export function stylesFromFlatSettings(s: LegacyFlatSettings): ParagraphStyles {
 		italic,
 		lineHeight: s.headingLineHeight,
 		lineHeightUnit: s.headingLineHeightUnit,
-		spaceBeforeEm: s[`${id}SpaceBeforeEm`],
-		spaceAfterEm: s[`${id}SpaceAfterEm`],
+		spaceBefore: s[`${id}SpaceBeforeEm`],
+		spaceBeforeUnit: s[`${id}SpaceBeforeUnit`],
+		spaceAfter: s[`${id}SpaceAfterEm`],
+		spaceAfterUnit: s[`${id}SpaceAfterUnit`],
 		smallCaps: s.smallCapsHeadings,
 	});
 	set("h1", { ...headingLevel("h1", s.h1SizePt, s.h1Weight, s.h1Italic), pageBreakBefore: s.pageBreakBeforeH1 });
@@ -294,8 +374,10 @@ export function stylesFromFlatSettings(s: LegacyFlatSettings): ParagraphStyles {
 	for (const id of ["h4", "h5", "h6"] as const) {
 		set(id, {
 			sizePt: Math.round(s.bodySizePt * minorRatios[id] * 100) / 100,
-			spaceBeforeEm: s.headingSpaceBeforeEm,
-			spaceAfterEm: s.headingSpaceAfterEm,
+			spaceBefore: s.headingSpaceBeforeEm,
+			spaceBeforeUnit: s.headingSpaceBeforeUnit,
+			spaceAfter: s.headingSpaceAfterEm,
+			spaceAfterUnit: s.headingSpaceAfterUnit,
 			smallCaps: s.smallCapsHeadings,
 		});
 	}
@@ -314,8 +396,10 @@ export interface LegacyFlatSettings {
 	bodyLineHeight: number;
 	bodyLineHeightUnit: LineHeightUnit;
 	paragraphSpacingEm: number;
+	paragraphSpacingUnit?: LengthUnit;
 	textWrapPretty: boolean;
 	hyphenation: boolean;
+	interCharacterJustify: boolean;
 	justify: boolean;
 	ligatures: boolean;
 	oldstyleFigures: boolean;
@@ -337,13 +421,21 @@ export interface LegacyFlatSettings {
 	h2Italic: boolean;
 	h3Italic: boolean;
 	h1SpaceBeforeEm: number;
+	h1SpaceBeforeUnit: LengthUnit;
 	h1SpaceAfterEm: number;
+	h1SpaceAfterUnit: LengthUnit;
 	h2SpaceBeforeEm: number;
+	h2SpaceBeforeUnit: LengthUnit;
 	h2SpaceAfterEm: number;
+	h2SpaceAfterUnit: LengthUnit;
 	h3SpaceBeforeEm: number;
+	h3SpaceBeforeUnit: LengthUnit;
 	h3SpaceAfterEm: number;
+	h3SpaceAfterUnit: LengthUnit;
 	headingSpaceBeforeEm: number;
+	headingSpaceBeforeUnit: LengthUnit;
 	headingSpaceAfterEm: number;
+	headingSpaceAfterUnit: LengthUnit;
 	headingLineHeight: number;
 	headingLineHeightUnit: LineHeightUnit;
 	pageBreakBeforeH1: boolean;

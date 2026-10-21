@@ -1,5 +1,5 @@
-import type { Alignment, MdToPdfSettings } from "./settings";
-import { findBundledFamily, resolveFontCss, shippedWeight } from "./fonts";
+import type { Alignment, MdToPdfSettings, PageNumberStyle } from "./settings";
+import { resolveFontCss, shippedWeight } from "./fonts";
 import type { ParagraphStyles } from "./paragraph-styles";
 import { pageBreakTags, styleCss } from "./style-css";
 
@@ -61,6 +61,7 @@ export function contentCss(s: MdToPdfSettings, styles: ParagraphStyles): string 
 	break-inside: avoid !important;
 	page-break-inside: avoid !important;
 }
+.md2pdf-root .md2pdf-linespace { display: block !important; margin: 0 !important; padding: 0 !important; border: 0 !important; }
 .md2pdf-root img, .md2pdf-root svg { max-width: 100% !important; height: auto !important; }
 .md2pdf-root svg { display: block !important; visibility: visible !important; opacity: 1 !important; }
 .md2pdf-root .block-language-brnotation,
@@ -312,6 +313,7 @@ body * {
 	size: ${pageSizeCss(s)};
 	margin: ${s.marginTopMm}mm ${s.marginRightMm}mm ${s.marginBottomMm}mm ${s.marginLeftMm}mm;
 }
+${pageNumberCss(s)}
 html, body {
 	background: #fff !important;
 	color: #111 !important;
@@ -364,47 +366,31 @@ export function headerFooterTemplates(
 
 	const headerTemplate = s.showHeader ? wrapTemplate(headerText, s.headerAlign) : "<span></span>";
 
-	const pageHtml = s.pageNumberFormat
-		.replace("{page}", '<span class="pageNumber"></span>')
-		.replace("{pages}", '<span class="totalPages"></span>');
-	const footerTemplate = s.showPageNumbers ? footerWrap(pageHtml, s, fontFaceCss) : "<span></span>";
+	// Page numbers are drawn by the @page margin box (see pageNumberCss), so the footer template stays empty.
+	const footerTemplate = "<span></span>";
 
 	return { headerTemplate, footerTemplate };
 }
 
 /**
- * Page-number footer: centered, styled like H3, and vertically centered in the bottom margin.
- * The box fills the bottom margin, so centering the text puts it halfway between the page edge and the margin.
+ * Page numbers in the bottom margin box. The format placeholders become CSS counters, so any
+ * counter style (arabic, roman, letters) works. Position follows pageNumberAlign.
  */
-/**
- * Measured in Obsidian's export: the page-number baseline sat above the margin midpoint, which the
- * footer template's layout does not account for. Starts at 2 pt and was raised by 3 pt after review.
- */
-const FOOTER_BASELINE_NUDGE_PT = 5;
-
-/** Half of League Gothic's cap height (735/1000 em), so the baseline drop centers the caps on the margin midpoint. */
-const CAP_HALF_DROP_EM = 0.735 / 2;
-
-/**
- * Shift that centers the cap height in the line box. Line boxes center between ascent and
- * descent, which leaves a cap-height text high when the font's ascent exceeds its descent.
- * Metrics are for the bundled League Gothic; other fonts use the default line box.
- */
-function capCenterOffsetEm(family: string): number {
-	const bundled = findBundledFamily(family);
-	if (!bundled || bundled.id !== "league-gothic") return 0;
-	const ascent = 935 / 1000;
-	const descent = 265 / 1000;
-	const capHeight = 735 / 1000;
-	return capHeight / 2 - (ascent - descent) / 2;
-}
-
-function footerWrap(inner: string, s: MdToPdfSettings, fontFaceCss: string): string {
-	const family = s.h3OverrideFont ? s.h3Font : s.headingFont;
-	const css = `${fontFaceCss}
-.pf { width:100%; height:${s.marginBottomMm}mm; display:flex; align-items:center; justify-content:center; font-family:${resolveFontCss(family)} !important; font-size:${s.h3SizePt}pt; font-weight:${shippedWeight(family, s.h3Weight, false)}; font-synthesis:none; font-style:normal; color:#000; }
-.pf > span { position:relative; top:calc(${capCenterOffsetEm(family)}em + ${FOOTER_BASELINE_NUDGE_PT}pt + ${CAP_HALF_DROP_EM}em); }`;
-	return `<style>${css}</style><div class="pf"><span>${inner}</span></div>`;
+export function pageNumberCss(s: MdToPdfSettings): string {
+	if (!s.showPageNumbers) return "";
+	const family = s.pageNumberFont || (s.h3OverrideFont ? s.h3Font : s.headingFont);
+	const style: PageNumberStyle = s.pageNumberStyle;
+	const parts = s.pageNumberFormat
+		.split(/(\{page\}|\{pages\})/)
+		.filter((part) => part !== "")
+		.map((part) => {
+			if (part === "{page}") return `counter(page, ${style})`;
+			if (part === "{pages}") return `counter(pages, ${style})`;
+			return `"${part.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+		});
+	const content = parts.length ? parts.join(" ") : `""`;
+	const box = s.pageNumberAlign === "left" ? "@bottom-left" : s.pageNumberAlign === "center" ? "@bottom-center" : "@bottom-right";
+	return `@page { ${box} { content: ${content}; font-family: ${resolveFontCss(family)} !important; font-size: ${s.pageNumberSizePt}pt; font-weight: ${shippedWeight(family, s.pageNumberWeight, false)}; font-synthesis: none; font-style: normal; color: #000; vertical-align: middle; } }`;
 }
 
 function wrapTemplate(inner: string, align: Alignment): string {
@@ -418,3 +404,4 @@ function escapeHtml(str: string): string {
 		.replace(/>/g, "&gt;")
 		.replace(/"/g, "&quot;");
 }
+

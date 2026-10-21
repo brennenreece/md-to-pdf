@@ -115,7 +115,9 @@ export default class MdToPdfPlugin extends Plugin {
 		const owner = new Component();
 		owner.load();
 		try {
-			const bodyHtml = await renderNoteToHtml(this.app, markdown, file.path, owner);
+			const bodyHtml = await renderNoteToHtml(this.app, markdown, file.path, owner, {
+				nonBreakingSpaces: settings.nonBreakingSpaces,
+			});
 			const fontFaceCss = await buildBundledFontFaces(
 				this.app.vault.adapter,
 				this.manifest.dir ?? "",

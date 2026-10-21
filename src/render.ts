@@ -1,6 +1,34 @@
 import { App, Component, MarkdownRenderer } from "obsidian";
+import { applyNonBreakingSpaces } from "./nbsp";
 
 const SETTLE_QUIET_MS = 400;
+
+const LINESPACE_UNITS = ["em", "in", "pt", "pc", "cm", "mm"];
+const LINESPACE_RE = /^\s*<linespace\s+(\d+(?:\.\d+)?)\s*(em|in|pt|pc|cm|mm)\s*>\s*$/i;
+
+/**
+ * Turns a line that holds only `<linespace N unit>` into an empty block of that
+ * height. Fenced code is left alone so examples of the syntax still show up.
+ */
+export function expandLinespaces(markdown: string): string {
+	let fence: string | null = null;
+	return markdown
+		.split("\n")
+		.map((line) => {
+			const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(line);
+			if (fenceMatch) {
+				const marker = fenceMatch[1];
+				if (fence === null) fence = marker;
+				else if (marker[0] === fence[0] && marker.length >= fence.length) fence = null;
+				return line;
+			}
+			if (fence !== null) return line;
+			const m = LINESPACE_RE.exec(line);
+			if (!m || !LINESPACE_UNITS.includes(m[2].toLowerCase())) return line;
+			return `<div class="md2pdf-linespace" style="height:${m[1]}${m[2].toLowerCase()}"></div>`;
+		})
+		.join("\n");
+}
 const SETTLE_MAX_MS = 8000;
 
 /**
@@ -12,6 +40,7 @@ export async function renderNoteToHtml(
 	markdown: string,
 	sourcePath: string,
 	owner: Component,
+	options: { nonBreakingSpaces?: boolean } = {},
 ): Promise<string> {
 	const host = document.body.createDiv({ cls: "md2pdf-render-host markdown-rendered" });
 	host.setCssStyles({
@@ -26,11 +55,12 @@ export async function renderNoteToHtml(
 	child.load();
 
 	try {
-		await MarkdownRenderer.render(app, markdown, host, sourcePath, child);
+		await MarkdownRenderer.render(app, expandLinespaces(markdown), host, sourcePath, child);
 		await waitForSettled(host);
 		await captureCanvases(host);
 		await inlineImages(host);
 		unwrapInternalLinks(host);
+		if (options.nonBreakingSpaces) applyNonBreakingSpaces(host);
 		const result = host.innerHTML;
 		return result;
 	} catch (err) {

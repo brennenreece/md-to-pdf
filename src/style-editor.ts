@@ -13,14 +13,17 @@ import {
 } from "./paragraph-styles";
 import { renderFontMenu, type FontMenuHost } from "./font-menu";
 import { faceLabel, findBundledFamily } from "./fonts";
-import { addCheckbox } from "./ui";
+import { addCheckbox, addInlineLabel } from "./ui";
+import { LENGTH_UNIT_LABELS, convertLength, type LengthUnit } from "./length";
 
 /** Fields grouped the way the InDesign character and paragraph panels group them. */
 type Field = {
 	key: StyleKey;
 	label: string;
-	kind: "font" | "number" | "pt" | "bool" | "check" | "select" | "face";
+	kind: "font" | "number" | "pt" | "bool" | "check" | "select" | "face" | "length";
 	options?: Record<string, string>;
+	/** For length fields: the style key that holds the unit. */
+	unitKey?: StyleKey;
 	/** Return true to leave this field out for the given style. */
 	hide?: (id: StyleId) => boolean;
 };
@@ -59,6 +62,7 @@ const GROUPS: Array<{ title: string; fields: Field[] }> = [
 				} satisfies Record<TextWrap, string>,
 			},
 			{ key: "hyphenation", label: "Hyphenation", kind: "bool" },
+			{ key: "interCharacterJustify", label: "Justify between characters", kind: "bool", hide: (id) => ["inlineCode", "link", "bold", "italic", "hr", "footnote"].includes(id) },
 			{ key: "pageBreakBefore", label: "Page break before", kind: "bool", hide: (id) => ["inlineCode", "link", "bold", "italic", "hr", "footnote"].includes(id) },
 		],
 	},
@@ -67,8 +71,8 @@ const GROUPS: Array<{ title: string; fields: Field[] }> = [
 		fields: [
 			{ key: "lineHeight", label: "Line height", kind: "number" },
 			{ key: "lineHeightUnit", label: "Line height unit", kind: "select", options: { em: "Multiple (em)", pt: "Points (pt)" } },
-			{ key: "spaceBeforeEm", label: "Space before (em)", kind: "number" },
-			{ key: "spaceAfterEm", label: "Space after (em)", kind: "number" },
+			{ key: "spaceBefore", label: "Space before", kind: "length", unitKey: "spaceBeforeUnit" },
+			{ key: "spaceAfter", label: "Space after", kind: "length", unitKey: "spaceAfterUnit" },
 		],
 	},
 ];
@@ -294,6 +298,35 @@ function renderField(
 				});
 			});
 			break;
+		case "length": {
+			// The value is stored with its own unit. Changing the unit converts the shown value,
+			// so the spacing stays the same.
+			const unitKey = field.unitKey!;
+			const unit = (resolved.props[unitKey] as LengthUnit) ?? "em";
+			const fontPt = resolved.props.sizePt;
+			const shown = Math.round((current as number) * 1000) / 1000;
+			setting.addText((t) =>
+				t.setValue(String(shown)).onChange(async (v) => {
+					const n = parseFloat(v);
+					if (Number.isNaN(n) || n < 0) return;
+					write(n);
+					await host.save();
+				}),
+			);
+			setting.addDropdown((d) => {
+				addInlineLabel(d.selectEl, "Unit");
+				for (const u of ["em", "pt", "pc", "in", "cm", "mm"] as LengthUnit[]) d.addOption(u, LENGTH_UNIT_LABELS[u]);
+				d.setValue(unit).onChange(async (u) => {
+					const next = u as LengthUnit;
+					const converted = convertLength(current as number, unit, next, fontPt);
+					write(Math.round(converted * 1000) / 1000);
+					(style.props as Record<string, unknown>)[unitKey] = next;
+					await host.save();
+					host.refresh();
+				});
+			});
+			break;
+		}
 		case "number":
 		case "pt":
 			setting.addText((t) =>

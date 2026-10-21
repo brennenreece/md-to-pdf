@@ -1,20 +1,34 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type MdToPdfPlugin from "./main";
 import {
+	faceLabel,
 	findBundledFamily,
 	fontKeysInUse,
 	loadPreviewFont,
+	shippedWeight,
 } from "./fonts";
+import { renderFontMenu } from "./font-menu";
 import { PAGE_MM, contentCss } from "./document";
 import { LENGTH_UNIT_LABELS, LengthUnit, convertLength } from "./length";
 import { applyTheme, snapshotTheme } from "./themes";
 import { renderStyleEditor, type StyleEditorState } from "./style-editor";
-import { DEFAULT_PARAGRAPH_STYLES, type StyleId } from "./paragraph-styles";
+import { DEFAULT_PARAGRAPH_STYLES, DEFAULT_TABLE_STYLE, resolveStyle, type StyleId, type TableStyle } from "./paragraph-styles";
 import { addCheckbox, addInlineLabel } from "./ui";
 
 export type PageSize = "A4" | "A5" | "Letter" | "Legal";
 export type Orientation = "portrait" | "landscape";
 export type Alignment = "left" | "center" | "right";
+
+/** CSS counter styles for page numbers. Each one is a valid `counter()` style name. */
+export type PageNumberStyle = "arabic" | "lower-roman" | "upper-roman" | "lower-alpha" | "upper-alpha";
+
+export const PAGE_NUMBER_STYLE_LABELS: Record<PageNumberStyle, string> = {
+	arabic: "1, 2, 3",
+	"lower-roman": "i, ii, iii",
+	"upper-roman": "I, II, III",
+	"lower-alpha": "a, b, c",
+	"upper-alpha": "A, B, C",
+};
 export type MarginUnit = "mm" | "cm" | "in" | "pt" | "pc";
 /** Line height is a multiplier of the font size (em) or an absolute size (pt). */
 export type LineHeightUnit = "em" | "pt";
@@ -109,8 +123,14 @@ export interface MdToPdfSettings {
 	headerAlign: Alignment;
 
 	showPageNumbers: boolean;
+	/** Placeholders {page} and {pages} are replaced with the numbers in the chosen style. */
 	pageNumberFormat: string;
+	pageNumberStyle: PageNumberStyle;
 	pageNumberAlign: Alignment;
+	/** Font stack for page numbers. Empty means "use the heading font", as before this setting existed. */
+	pageNumberFont: string;
+	pageNumberWeight: number;
+	pageNumberSizePt: number;
 
 	/** Snap body text and heading spacing to a vertical baseline grid. */
 	baselineGridEnabled: boolean;
@@ -120,6 +140,10 @@ export interface MdToPdfSettings {
 	textWrapPretty: boolean;
 	/** Hyphenate words at line ends using the browser's dictionary. */
 	hyphenation: boolean;
+	/** Spread justified body text between characters as well as words. */
+	interCharacterJustify: boolean;
+	/** Insert non-breaking spaces after short words, numbers, and section marks (typograf). */
+	nonBreakingSpaces: boolean;
 	/** Language for hyphenation and line-breaking (BCP 47 tag, e.g. en-US). */
 	hyphenLang: string;
 	justify: boolean;
@@ -154,6 +178,8 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	baselineGridPt: 16.5,
 	textWrapPretty: true,
 	hyphenation: false,
+	interCharacterJustify: false,
+	nonBreakingSpaces: false,
 	hyphenLang: "en-US",
 	justify: false,
 	ligatures: true,
@@ -212,7 +238,11 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 
 	showPageNumbers: true,
 	pageNumberFormat: "Page {page} of {pages}",
-	pageNumberAlign: "right",
+	pageNumberStyle: "arabic",
+	pageNumberAlign: "center",
+	pageNumberFont: "",
+	pageNumberWeight: 400,
+	pageNumberSizePt: 8,
 	livePreview: true,
 	livePreviewDelayMs: 1000,
 };
@@ -449,6 +479,20 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName("Typography").setHeading();
 		this.baselineGridSetting(containerEl);
 		this.textSetting(containerEl, "Hyphenation language", "BCP 47 tag, for example en-US.", "hyphenLang");
+		const justifyRow = new Setting(containerEl)
+			.setName("Justify between characters")
+			.setDesc("Spreads justified body lines between characters as well as words. Chromium 145 or later.");
+		addCheckbox(justifyRow, s.interCharacterJustify, async (v) => {
+			s.interCharacterJustify = v;
+			await save();
+		});
+		const nbspRow = new Setting(containerEl)
+			.setName("Non-breaking spaces")
+			.setDesc("Keeps short words, numbers, and section marks attached to the next word (for example “§ 4” or “12 pt”).");
+		addCheckbox(nbspRow, s.nonBreakingSpaces, async (v) => {
+			s.nonBreakingSpaces = v;
+			await save();
+		});
 
 		new Setting(containerEl).setName("Paragraph styles").setHeading();
 		renderStyleEditor(containerEl, {
@@ -458,6 +502,8 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			adapter: this.app.vault.adapter,
 			pluginDir: this.plugin.manifest.dir ?? "",
 		}, this.styleState);
+
+		this.tableSettings(containerEl);
 
 		new Setting(containerEl).setName("Header and footer").setHeading();
 		const headerRow = new Setting(containerEl).setName("Show header").setDesc("Placeholders: {{title}}, {{date}}.");
@@ -472,6 +518,23 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			await save();
 		});
 		this.inlineText(pageNumRow, "pageNumberFormat", "Format", 180);
+		const pageNumStyleRow = new Setting(containerEl).setName("Page number style");
+		pageNumStyleRow.addDropdown((d) => {
+			for (const [value, label] of Object.entries(PAGE_NUMBER_STYLE_LABELS)) d.addOption(value, label);
+			d.setValue(s.pageNumberStyle).onChange(async (v) => {
+				s.pageNumberStyle = v as PageNumberStyle;
+				await save();
+			});
+		});
+		const pageNumPosRow = new Setting(containerEl).setName("Page number position");
+		pageNumPosRow.addDropdown((d) => {
+			d.addOption("left", "Left").addOption("center", "Center").addOption("right", "Right");
+			d.setValue(s.pageNumberAlign).onChange(async (v) => {
+				s.pageNumberAlign = v as Alignment;
+				await save();
+			});
+		});
+		this.pageNumberFontSettings(containerEl);
 
 		new Setting(containerEl).setName("PDF preview").setHeading();
 		const liveRow = new Setting(containerEl).setName("Live update").setDesc("Re-render the preview pane when the note or settings change.");
@@ -621,6 +684,140 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings();
 			});
 		});
+	}
+
+	/** Font, weight, and size for page numbers. An empty font follows the heading font. */
+	private pageNumberFontSettings(el: HTMLElement) {
+		const s = this.plugin.settings;
+		const save = () => this.plugin.saveSettings();
+		const fontRow = new Setting(el).setName("Page number font").setDesc("Leave blank to use the heading font.");
+		const fontHost = {
+			adapter: this.app.vault.adapter,
+			pluginDir: this.plugin.manifest.dir ?? "",
+		};
+		renderFontMenu(fontRow.controlEl, fontHost, s.pageNumberFont, async (v) => {
+			s.pageNumberFont = v;
+			await save();
+			this.refresh();
+		});
+
+		const weightRow = new Setting(el).setName("Page number weight");
+		const family = s.pageNumberFont ? findBundledFamily(s.pageNumberFont) : undefined;
+		weightRow.addDropdown((d) => {
+			if (family) {
+				// Only the weights this family ships, so the choice always matches a real file.
+				const faces = family.faces.filter((f) => !f.italic);
+				for (const face of faces) d.addOption(String(face.weight), faceLabel(face));
+				d.setValue(String(shippedWeight(s.pageNumberFont, s.pageNumberWeight, false)));
+			} else {
+				for (const w of [400, 700]) d.addOption(String(w), faceLabel({ file: "", weight: w, italic: false }));
+				d.setValue(String(s.pageNumberWeight === 700 ? 700 : 400));
+			}
+			d.onChange(async (v) => {
+				s.pageNumberWeight = Number(v);
+				await save();
+			});
+		});
+
+		const sizeRow = new Setting(el).setName("Page number size");
+		sizeRow.addText((t) => {
+			addInlineLabel(t.inputEl, "pt");
+			t.inputEl.style.width = "80px";
+			t.setValue(String(s.pageNumberSizePt)).onChange(async (v) => {
+				const n = Number(v);
+				if (v.trim() === "" || !Number.isFinite(n) || n <= 0) return;
+				s.pageNumberSizePt = n;
+				await save();
+			});
+		});
+	}
+
+	/** Table fills and rules. Colors use native pickers. Widths are in pt, and 0 turns a rule off. */
+	private tableSettings(el: HTMLElement) {
+		new Setting(el).setName("Table").setHeading();
+		const t = this.plugin.styles.tableStyle ?? { ...DEFAULT_TABLE_STYLE };
+		const tableStyle = this.plugin.styles.table;
+		const spaceRow = (name: string, key: "spaceBefore" | "spaceAfter", unitKey: "spaceBeforeUnit" | "spaceAfterUnit", desc: string) => {
+			const unit = tableStyle.props[unitKey] ?? "em";
+			new Setting(el).setName(name).setDesc(desc)
+				.addText((x) =>
+					x.setValue(String(tableStyle.props[key] ?? "")).onChange(async (v) => {
+						const n = Number(v);
+						if (v.trim() === "" || !Number.isFinite(n) || n < 0) return;
+						tableStyle.props[key] = n;
+						await this.plugin.saveSettings();
+					}),
+				)
+				.addDropdown((d) => {
+					addInlineLabel(d.selectEl, "Unit");
+					for (const u of ["em", "pt", "pc", "in", "cm", "mm"] as LengthUnit[]) d.addOption(u, LENGTH_UNIT_LABELS[u]);
+					d.setValue(unit).onChange(async (u) => {
+						const next = u as LengthUnit;
+						const current = tableStyle.props[key] ?? 0;
+						const fontPt = resolveStyle(this.plugin.styles, "table").props.sizePt;
+						tableStyle.props[key] = Math.round(convertLength(current, unit, next, fontPt) * 1000) / 1000;
+						tableStyle.props[unitKey] = next;
+						await this.plugin.saveSettings();
+						this.display();
+					});
+				});
+		};
+		spaceRow("Space before table", "spaceBefore", "spaceBeforeUnit", "Space above each table. Same as the Table paragraph style.");
+		spaceRow("Space after table", "spaceAfter", "spaceAfterUnit", "Space below each table. Same as the Table paragraph style.");
+		this.plugin.styles.tableStyle = t;
+		const save = () => this.plugin.saveSettings();
+		const colorRow = (name: string, key: keyof TableStyle, desc: string) => {
+			const row = new Setting(el).setName(name).setDesc(desc);
+			row.addColorPicker((c) => c.setValue(String(t[key] || "#ffffff")).onChange(async (v) => {
+				(t as unknown as Record<string, unknown>)[key] = v;
+				await save();
+			}));
+			row.addExtraButton((b) => b.setIcon("reset").setTooltip("Clear").onClick(async () => {
+				(t as unknown as Record<string, unknown>)[key] = DEFAULT_TABLE_STYLE[key];
+				await save();
+				this.display();
+			}));
+			return row;
+		};
+		const numRow = (name: string, key: keyof TableStyle, desc: string, min: number, max: number, step: number) => {
+			new Setting(el).setName(name).setDesc(desc).addSlider((sl) =>
+				sl.setLimits(min, max, step).setValue(Number(t[key])).setDynamicTooltip().onChange(async (v) => {
+					(t as unknown as Record<string, unknown>)[key] = v;
+					await save();
+				}),
+			);
+		};
+		const toggleRow = (name: string, key: keyof TableStyle, desc: string) => {
+			new Setting(el).setName(name).setDesc(desc).addToggle((tg) => tg.setValue(Boolean(t[key])).onChange(async (v) => {
+				(t as unknown as Record<string, unknown>)[key] = v;
+				await save();
+			}));
+		};
+
+		new Setting(el).setName("Header row").setHeading();
+		colorRow("Header fill", "headerFill", "Background of the first row. Clear for none.");
+		colorRow("Header text", "headerText", "Text color of the first row. Clear to keep the body color.");
+		toggleRow("Header bold", "headerBold", "Bold the header text.");
+		numRow("Header rule", "headerRulePt", "Line under the header row, in pt. 0 for none.", 0, 4, 0.25);
+		colorRow("Header rule color", "headerRuleColor", "Color of the line under the header row.");
+
+		new Setting(el).setName("Body rows").setHeading();
+		colorRow("Body fill", "bodyFill", "Background of body rows. Clear for none.");
+		colorRow("Alternate row fill", "zebraFill", "Background of every other body row. Clear for none.");
+		numRow("Row rule", "rowRulePt", "Line under each body row, in pt. 0 for none.", 0, 4, 0.25);
+		colorRow("Row rule color", "rowRuleColor", "Color of the lines between body rows.");
+
+		new Setting(el).setName("Columns").setHeading();
+		numRow("Column rule", "columnRulePt", "Vertical line between columns, in pt. 0 for none.", 0, 4, 0.25);
+		colorRow("Column rule color", "columnRuleColor", "Color of the vertical lines between columns.");
+
+		new Setting(el).setName("Grid").setHeading();
+		numRow("Outer border", "outerRulePt", "Border around the whole table, in pt. 0 for none.", 0, 4, 0.25);
+		colorRow("Outer border color", "outerRuleColor", "Color of the outer border.");
+		new Setting(el).setName("Cell padding").setHeading();
+		numRow("Vertical padding", "cellPaddingVEm", "Space above and below the text in each cell, in em.", 0, 1, 0.05);
+		numRow("Horizontal padding", "cellPaddingHEm", "Space left and right of the text in each cell, in em.", 0, 1, 0.05);
+		toggleRow("Full width", "fullWidth", "Stretch the table across the full text width within the margins, with equal column widths.");
 	}
 
 	private textSetting(el: HTMLElement, name: string, desc: string, key: TextKey) {

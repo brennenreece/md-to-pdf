@@ -36,6 +36,8 @@ export const THEME_KEYS: Array<keyof MdToPdfSettings> = [
 	"baselineGridPt",
 	"textWrapPretty",
 	"hyphenation",
+	"interCharacterJustify",
+	"nonBreakingSpaces",
 	"hyphenLang",
 	"justify",
 	"ligatures",
@@ -90,7 +92,11 @@ export const THEME_KEYS: Array<keyof MdToPdfSettings> = [
 	"headerAlign",
 	"showPageNumbers",
 	"pageNumberFormat",
+	"pageNumberStyle",
 	"pageNumberAlign",
+	"pageNumberFont",
+	"pageNumberWeight",
+	"pageNumberSizePt",
 ];
 
 /** Copies the style fields and paragraph styles into a new theme object. */
