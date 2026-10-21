@@ -16,6 +16,7 @@ The font menu lists the system stacks, then two bundled collections:
 - **League of Moveable Type**: all families in the collection, licensed under the SIL Open Font License 1.1 (`assets/fonts/league/LICENSE-OFL.txt`). See `assets/fonts/league/NOTICE.md` for copyright notices.
 
 - **League Gothic** and **League Gothic Condensed**: included under the same license.
+- **Google Fonts**: Libre Franklin, Archivo, Archivo Condensed, Oswald, Pathway Gothic One, and Barlow. Licensed under the SIL Open Font License 1.1 (`assets/fonts/google/LICENSE-OFL.txt`). Variable fonts are shipped as static instances at the weights listed in `assets/fonts/google/NOTICE.md`.
 
 TeX Gyre Chorus is not bundled because the archive only includes its medium italic face.
 

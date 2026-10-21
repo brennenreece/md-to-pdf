@@ -8,7 +8,7 @@ import { STYLE_ORDER, resolveStyle, type ParagraphStyles } from "./paragraph-sty
  * regardless of what the system has installed.
  */
 
-export type FontCollection = "tg" | "league" | "system";
+export type FontCollection = "tg" | "league" | "google" | "system";
 
 export interface BundledFace {
 	file: string;
@@ -28,6 +28,7 @@ export const COLLECTION_LABELS: Record<FontCollection, string> = {
 	system: "System fonts",
 	tg: "TeX Gyre",
 	league: "League of Moveable Type",
+	google: "Google Fonts",
 };
 
 function tgFamily(id: string, name: string): BundledFamily {
@@ -45,6 +46,15 @@ function leagueFamily(id: string, name: string, files: Array<[string, number, bo
 		id: `league-${id}`,
 		name,
 		collection: "league",
+		faces: files.map(([file, weight, italic]) => ({ file, weight, italic: italic ?? false })),
+	};
+}
+
+function googleFamily(id: string, name: string, files: Array<[string, number, boolean?]>): BundledFamily {
+	return {
+		id: `google-${id}`,
+		name,
+		collection: "google",
 		faces: files.map(([file, weight, italic]) => ({ file, weight, italic: italic ?? false })),
 	};
 }
@@ -130,6 +140,53 @@ export const BUNDLED_FAMILIES: BundledFamily[] = [
 	leagueFamily("blackout-midnight", "Blackout Midnight", [["Blackout Midnight.ttf", 400]]),
 	leagueFamily("blackout-sunrise", "Blackout Sunrise", [["Blackout Sunrise.ttf", 400]]),
 	leagueFamily("blackout-2am", "Blackout 2 AM", [["Blackout 2 AM.ttf", 400]]),
+	googleFamily("libre-franklin", "Libre Franklin", [
+		["LibreFranklin-400.ttf", 400],
+		["LibreFranklin-500.ttf", 500],
+		["LibreFranklin-600.ttf", 600],
+		["LibreFranklin-700.ttf", 700],
+		["LibreFranklin-Italic-400.ttf", 400, true],
+		["LibreFranklin-Italic-700.ttf", 700, true],
+	]),
+	googleFamily("archivo", "Archivo", [
+		["Archivo-400.ttf", 400],
+		["Archivo-500.ttf", 500],
+		["Archivo-600.ttf", 600],
+		["Archivo-700.ttf", 700],
+		["Archivo-Italic-400.ttf", 400, true],
+		["Archivo-Italic-700.ttf", 700, true],
+	]),
+	googleFamily("archivo-condensed", "Archivo Condensed", [
+		["ArchivoCondensed-400.ttf", 400],
+		["ArchivoCondensed-500.ttf", 500],
+		["ArchivoCondensed-600.ttf", 600],
+		["ArchivoCondensed-700.ttf", 700],
+		["ArchivoCondensed-Italic-400.ttf", 400, true],
+		["ArchivoCondensed-Italic-700.ttf", 700, true],
+	]),
+	googleFamily("oswald", "Oswald", [
+		["Oswald-400.ttf", 400],
+		["Oswald-500.ttf", 500],
+		["Oswald-600.ttf", 600],
+		["Oswald-700.ttf", 700],
+	]),
+	googleFamily("pathway-gothic-one", "Pathway Gothic One", [["PathwayGothicOne-Regular.ttf", 400]]),
+	googleFamily("barlow", "Barlow", [
+		["Barlow-Thin.ttf", 100],
+		["Barlow-ExtraLight.ttf", 200],
+		["Barlow-Light.ttf", 300],
+		["Barlow-Regular.ttf", 400],
+		["Barlow-Medium.ttf", 500],
+		["Barlow-SemiBold.ttf", 600],
+		["Barlow-Bold.ttf", 700],
+		["Barlow-ExtraBold.ttf", 800],
+		["Barlow-Black.ttf", 900],
+		["Barlow-Italic.ttf", 400, true],
+		["Barlow-MediumItalic.ttf", 500, true],
+		["Barlow-SemiBoldItalic.ttf", 600, true],
+		["Barlow-BoldItalic.ttf", 700, true],
+	]),
+
 ];
 
 /** Option id used in settings and in saved themes: `family:<id>` for bundled families. */
