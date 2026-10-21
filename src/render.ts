@@ -1,5 +1,5 @@
 import { App, Component, MarkdownRenderer } from "obsidian";
-import { applyNonBreakingSpaces } from "./nbsp";
+import { applyTypograf } from "./nbsp";
 
 const SETTLE_QUIET_MS = 400;
 
@@ -40,7 +40,7 @@ export async function renderNoteToHtml(
 	markdown: string,
 	sourcePath: string,
 	owner: Component,
-	options: { nonBreakingSpaces?: boolean } = {},
+	options: { nonBreakingSpaces?: boolean; smartQuotes?: boolean } = {},
 ): Promise<string> {
 	const host = document.body.createDiv({ cls: "md2pdf-render-host markdown-rendered" });
 	host.setCssStyles({
@@ -60,7 +60,7 @@ export async function renderNoteToHtml(
 		await captureCanvases(host);
 		await inlineImages(host);
 		unwrapInternalLinks(host);
-		if (options.nonBreakingSpaces) applyNonBreakingSpaces(host);
+		if (options.nonBreakingSpaces || options.smartQuotes) applyTypograf(host, options);
 		const result = host.innerHTML;
 		return result;
 	} catch (err) {

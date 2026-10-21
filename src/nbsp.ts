@@ -3,7 +3,7 @@ import Typograf from "typograf";
 /**
  * Typograf rules that only insert non-breaking spaces: after short words and
  * numbers, before the last word of a line, and after section and paragraph
- * marks. Quotes, dashes, and other typographic rules are left off.
+ * marks. Dashes and other typographic rules are left off.
  */
 const NBSP_RULES = [
 	"common/nbsp/afterNumber",
@@ -14,21 +14,34 @@ const NBSP_RULES = [
 	"common/nbsp/beforeShortLastWord",
 ];
 
+/** Curly double quotes and apostrophes. Typograf does not convert single-quote pairs. */
+const QUOTE_RULES = [
+	"common/punctuation/quote",
+	"common/punctuation/apostrophe",
+];
+
 const SKIP_TAGS = new Set(["CODE", "PRE", "KBD", "SAMP", "SCRIPT", "STYLE", "MATH", "A", "svg"]);
 
-function makeTypograf(): Typograf {
+function makeTypograf(options: TypografOptions): Typograf {
 	const tp = new Typograf({ locale: ["en-US"] });
 	tp.disableRule("*");
-	for (const rule of NBSP_RULES) tp.enableRule(rule);
+	if (options.nonBreakingSpaces) for (const rule of NBSP_RULES) tp.enableRule(rule);
+	if (options.smartQuotes) for (const rule of QUOTE_RULES) tp.enableRule(rule);
 	return tp;
 }
 
+export interface TypografOptions {
+	nonBreakingSpaces?: boolean;
+	smartQuotes?: boolean;
+}
+
 /**
- * Inserts non-breaking spaces into the text of rendered markdown.
- * Only text nodes are changed, so code, links, and attributes are untouched.
+ * Applies the enabled typograf rules (non-breaking spaces and/or smart quotes)
+ * to the text of rendered markdown. Only text nodes are changed, so code,
+ * links, and attributes are untouched.
  */
-export function applyNonBreakingSpaces(root: HTMLElement): void {
-	const tp = makeTypograf();
+export function applyTypograf(root: HTMLElement, options: TypografOptions): void {
+	const tp = makeTypograf(options);
 	const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
 		acceptNode(node) {
 			for (let el = node.parentElement; el && el !== root; el = el.parentElement) {

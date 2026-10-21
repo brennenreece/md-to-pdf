@@ -38,6 +38,7 @@ export const THEME_KEYS: Array<keyof MdToPdfSettings> = [
 	"hyphenation",
 	"interCharacterJustify",
 	"nonBreakingSpaces",
+	"smartQuotes",
 	"hyphenLang",
 	"justify",
 	"ligatures",

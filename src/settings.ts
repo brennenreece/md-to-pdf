@@ -144,6 +144,8 @@ export interface MdToPdfSettings {
 	interCharacterJustify: boolean;
 	/** Insert non-breaking spaces after short words, numbers, and section marks (typograf). */
 	nonBreakingSpaces: boolean;
+	/** Convert straight double quotes and apostrophes to curly typographic quotes (typograf). */
+	smartQuotes: boolean;
 	/** Language for hyphenation and line-breaking (BCP 47 tag, e.g. en-US). */
 	hyphenLang: string;
 	justify: boolean;
@@ -180,6 +182,7 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	hyphenation: false,
 	interCharacterJustify: false,
 	nonBreakingSpaces: false,
+	smartQuotes: true,
 	hyphenLang: "en-US",
 	justify: false,
 	ligatures: true,
@@ -491,6 +494,13 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			.setDesc("Keeps short words, numbers, and section marks attached to the next word (for example “§ 4” or “12 pt”).");
 		addCheckbox(nbspRow, s.nonBreakingSpaces, async (v) => {
 			s.nonBreakingSpaces = v;
+			await save();
+		});
+		const quotesRow = new Setting(containerEl)
+			.setName("Smart quotes")
+			.setDesc("Uses curly double quotes and apostrophes instead of straight ones. Single-quote pairs are not converted.");
+		addCheckbox(quotesRow, s.smartQuotes, async (v) => {
+			s.smartQuotes = v;
 			await save();
 		});
 

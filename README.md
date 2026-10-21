@@ -50,6 +50,10 @@ Hyphenation and justification are applied by Chromium's print engine, so they sh
 
 Turn on **Non-breaking spaces** to keep short words, numbers, and section marks attached to the next word, so "§ 4", "12 pt", and "Fig. 3" don't split across lines. This uses [typograf](https://github.com/typograf/typograf) with only its non-breaking-space rules. Text in code, links, and math is left alone.
 
+### Smart quotes
+
+Smart quotes are on by default. They turn straight double quotes into curly ones and straight apostrophes into ’. This uses typograf's quote and apostrophe rules. Single-quote pairs such as `'fine'` are not converted, so they stay straight. Text in code, links, and math is left alone.
+
 ### Blank lines
 
 Put `<linespace N unit>` on its own line to add an empty space of that height, for example `<linespace 2 em>` or `<linespace 0.5 in>`. Angle brackets are used because square brackets become links in Obsidian. Units are em, in, pt, pc, cm, or mm. The space shows in both the preview and the PDF. Lines inside code blocks are not changed.
