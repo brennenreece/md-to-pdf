@@ -77,7 +77,7 @@ export function renderFontMenu(
 			addRow(systemGroup, label, value, value, value === current, choose);
 		}
 
-		for (const collection of ["tg", "league"] as const) {
+		for (const collection of ["tg", "league", "google"] as const) {
 			const families = BUNDLED_FAMILIES.filter((f) => f.collection === collection);
 			if (families.length === 0) continue;
 			const group = popover.createDiv({ cls: "md2pdf-font-group" });
