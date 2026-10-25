@@ -5,7 +5,8 @@ import { buildDocumentHtml } from "./document";
 import { buildBundledFontFaces, fontKeysInUse } from "./fonts";
 import type { SavedTheme } from "./themes";
 import { DEFAULT_PARAGRAPH_STYLES, ParagraphStyles, stylesFromFlatSettings, withMissingStyles } from "./paragraph-styles";
-import { printHtmlToPdf } from "./pdf";
+import { mergePdfs, pdfPageCount, printHtmlToPdf } from "./pdf";
+import { applyMarker, markSectionBreaks, splitRenderedSections, NumberingState, PageNumberingMarker } from "./page-numbering";
 import { PdfPreviewView, PREVIEW_VIEW_TYPE } from "./preview-view";
 
 const FRONTMATTER_RE = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/;
@@ -104,39 +105,101 @@ export default class MdToPdfPlugin extends Plugin {
 		await this.exportFile(file);
 	}
 
+	/**
+	 * Renders a note once and splits it into page-numbering sections. Each section keeps its body
+	 * and the numbering rules from its marker. Notes without markers produce one section.
+	 */
+	async renderNoteSections(
+		file: TFile,
+		settings: MdToPdfSettings,
+	): Promise<{ bodies: string[]; markers: PageNumberingMarker[]; fontFaceCss: string; appCss: string }> {
+		const raw = await this.app.vault.read(file);
+		const source = raw.replace(FRONTMATTER_RE, "");
+		const { markdown, markers } = markSectionBreaks(source);
+		const owner = new Component();
+		owner.load();
+		try {
+			const renderedHtml = await renderNoteToHtml(this.app, markdown, file.path, owner, {
+				nonBreakingSpaces: settings.nonBreakingSpaces,
+				smartQuotes: settings.smartQuotes,
+			});
+			const bodies = markers.length ? splitRenderedSections(renderedHtml, markers.length) : [renderedHtml];
+			if (!bodies) throw new Error("Page numbering markers could not be matched in the rendered note.");
+			const fontFaceCss = await buildBundledFontFaces(
+				this.app.vault.adapter,
+				this.manifest.dir ?? "",
+				fontKeysInUse(this.styles),
+			);
+			const appCss = collectAppCss() + "\n" + (await collectThemeCss(this.app));
+			return { bodies, markers, fontFaceCss, appCss };
+		} finally {
+			owner.unload();
+		}
+	}
+
 	/** Builds the full print HTML for a note. Shared by export and the live preview. */
 	async buildNoteDocument(
 		file: TFile,
 		settings: MdToPdfSettings = this.settings,
 		opts: { showBaselineGrid?: boolean; showMargins?: boolean } = {},
 	): Promise<string> {
-		const raw = await this.app.vault.read(file);
-		const markdown = raw.replace(FRONTMATTER_RE, "");
-		const owner = new Component();
-		owner.load();
-		try {
-			const bodyHtml = await renderNoteToHtml(this.app, markdown, file.path, owner, {
-				nonBreakingSpaces: settings.nonBreakingSpaces,
-				smartQuotes: settings.smartQuotes,
-			});
-			const fontFaceCss = await buildBundledFontFaces(
-				this.app.vault.adapter,
-				this.manifest.dir ?? "",
-				fontKeysInUse(this.styles),
-			);
-			return buildDocumentHtml({
+		const { bodies, fontFaceCss, appCss } = await this.renderNoteSections(file, settings);
+		return buildDocumentHtml({
+			title: file.basename,
+			bodyHtml: bodies.join(""),
+			appCss,
+			fontFaceCss,
+			settings,
+			styles: this.styles,
+			showBaselineGrid: opts.showBaselineGrid,
+			showMargins: opts.showMargins,
+		});
+	}
+
+	/**
+	 * Prints a note to one PDF. Each numbering section is printed as its own document, starting at
+	 * the number that follows the previous section's last page. Only `{pages}` is per section.
+	 */
+	async printNote(
+		file: TFile,
+		settings: MdToPdfSettings = this.settings,
+		opts: { showBaselineGrid?: boolean; showMargins?: boolean } = {},
+	): Promise<ArrayBuffer> {
+		const { bodies, markers, fontFaceCss, appCss } = await this.renderNoteSections(file, settings);
+		if (markers.length === 0) {
+			const html = buildDocumentHtml({
 				title: file.basename,
-				bodyHtml,
-				appCss: collectAppCss() + "\n" + (await collectThemeCss(this.app)),
+				bodyHtml: bodies[0],
+				appCss,
 				fontFaceCss,
 				settings,
 				styles: this.styles,
 				showBaselineGrid: opts.showBaselineGrid,
 				showMargins: opts.showMargins,
 			});
-		} finally {
-			owner.unload();
+			return printHtmlToPdf(html, settings, file.basename);
 		}
+		const parts: ArrayBuffer[] = [];
+		let state: NumberingState = { next: 1, style: settings.pageNumberStyle, hidden: false };
+		for (let i = 0; i < bodies.length; i++) {
+			// Body i+1 follows marker i. The first body uses the document defaults.
+			state = applyMarker(state, i === 0 ? null : markers[i - 1]);
+			const html = buildDocumentHtml({
+				title: file.basename,
+				bodyHtml: bodies[i],
+				appCss,
+				fontFaceCss,
+				settings,
+				styles: this.styles,
+				showBaselineGrid: opts.showBaselineGrid,
+				showMargins: opts.showMargins,
+				numbering: { firstPage: state.next, style: state.style, hidden: state.hidden },
+			});
+			const part = await printHtmlToPdf(html, settings, file.basename);
+			parts.push(part);
+			state = { ...state, next: state.next + (await pdfPageCount(part)) };
+		}
+		return mergePdfs(parts);
 	}
 
 	async exportFile(file: TFile) {
@@ -147,8 +210,7 @@ export default class MdToPdfPlugin extends Plugin {
 
 		const notice = new Notice(`Exporting ${file.basename}…`, 0);
 		try {
-			const html = await this.buildNoteDocument(file);
-			const pdf = await printHtmlToPdf(html, this.settings, file.basename);
+			const pdf = await this.printNote(file);
 
 			const outPath = file.path.replace(/\.md$/, ".pdf");
 			await this.app.vault.adapter.writeBinary(outPath, pdf);

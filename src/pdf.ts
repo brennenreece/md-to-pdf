@@ -1,5 +1,6 @@
 import type { MdToPdfSettings } from "./settings";
 import { headerFooterTemplates } from "./document";
+import { PDFDocument } from "pdf-lib";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -65,4 +66,23 @@ export async function printHtmlToPdf(
 		win.destroy();
 		fs.unlink(tmpFile, () => undefined);
 	}
+}
+
+/** Number of pages in a PDF, read from its page tree. */
+export async function pdfPageCount(pdf: ArrayBuffer): Promise<number> {
+	const doc = await PDFDocument.load(pdf, { ignoreEncryption: true });
+	return doc.getPageCount();
+}
+
+/** Joins PDFs in order into one PDF. */
+export async function mergePdfs(parts: ArrayBuffer[]): Promise<ArrayBuffer> {
+	if (parts.length === 1) return parts[0];
+	const out = await PDFDocument.create();
+	for (const part of parts) {
+		const src = await PDFDocument.load(part, { ignoreEncryption: true });
+		const pages = await out.copyPages(src, src.getPageIndices());
+		for (const page of pages) out.addPage(page);
+	}
+	const bytes = await out.save();
+	return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }

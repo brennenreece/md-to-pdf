@@ -280,6 +280,17 @@ function topCapScript(
 </script>`;
 }
 
+/**
+ * Numbering for one section printed as its own document. `firstPage` is the number on its first
+ * sheet. `pagesTotal` replaces `{pages}` with a fixed value once the whole note's length is known.
+ */
+export interface SectionNumbering {
+	firstPage?: number;
+	style?: PageNumberStyle | null;
+	hidden?: boolean;
+	pagesTotal?: number;
+}
+
 /** Builds the full print document: the app's CSS first, then print overrides. */
 export function buildDocumentHtml(opts: {
 	title: string;
@@ -292,6 +303,8 @@ export function buildDocumentHtml(opts: {
 	showBaselineGrid?: boolean;
 	/** Preview-only: draws a magenta frame at the margin edges. */
 	showMargins?: boolean;
+	/** Per-section page numbering from `<page-numbering>` markers. */
+	numbering?: SectionNumbering;
 }): string {
 	const s = opts.settings;
 	const reset = `
@@ -317,7 +330,8 @@ body * {
 	size: ${pageSizeCss(s)};
 	margin: ${s.marginTopMm}mm ${s.marginRightMm}mm ${s.marginBottomMm}mm ${s.marginLeftMm}mm;
 }
-${pageNumberCss(s)}
+${pageNumberCss(s, opts.numbering)}
+${opts.numbering?.firstPage !== undefined ? `html { counter-reset: page ${opts.numbering.firstPage - 1}; }` : ""}
 html, body {
 	background: #fff !important;
 	color: #111 !important;
@@ -380,20 +394,23 @@ export function headerFooterTemplates(
  * Page numbers in the bottom margin box. The format placeholders become CSS counters, so any
  * counter style (arabic, roman, letters) works. Position follows pageNumberAlign.
  */
-export function pageNumberCss(s: MdToPdfSettings): string {
+export function pageNumberCss(s: MdToPdfSettings, numbering?: SectionNumbering): string {
 	if (!s.showPageNumbers) return "";
+	const box = s.pageNumberAlign === "left" ? "@bottom-left" : s.pageNumberAlign === "center" ? "@bottom-center" : "@bottom-right";
+	if (numbering?.hidden) return `@page { ${box} { content: none; } }`;
 	const family = s.pageNumberFont || (s.h3OverrideFont ? s.h3Font : s.headingFont);
-	const style: PageNumberStyle = s.pageNumberStyle;
+	const style: PageNumberStyle = numbering?.style ?? s.pageNumberStyle;
 	const parts = s.pageNumberFormat
 		.split(/(\{page\}|\{pages\})/)
 		.filter((part) => part !== "")
 		.map((part) => {
 			if (part === "{page}") return `counter(page, ${style})`;
-			if (part === "{pages}") return `counter(pages, ${style})`;
+			if (part === "{pages}") {
+				return numbering?.pagesTotal !== undefined ? `"${numbering.pagesTotal}"` : `counter(pages, ${style})`;
+			}
 			return `"${part.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 		});
 	const content = parts.length ? parts.join(" ") : `""`;
-	const box = s.pageNumberAlign === "left" ? "@bottom-left" : s.pageNumberAlign === "center" ? "@bottom-center" : "@bottom-right";
 	return `@page { ${box} { content: ${content}; font-family: ${resolveFontCss(family)} !important; font-size: ${s.pageNumberSizePt}pt; font-weight: ${shippedWeight(family, s.pageNumberWeight, false)}; font-synthesis: none; font-style: normal; color: #000; vertical-align: middle; } }`;
 }
 

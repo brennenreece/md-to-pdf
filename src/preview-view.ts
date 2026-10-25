@@ -1,6 +1,5 @@
 import { ItemView, TFile, WorkspaceLeaf } from "obsidian";
 import type MdToPdfPlugin from "./main";
-import { printHtmlToPdf } from "./pdf";
 
 export const PREVIEW_VIEW_TYPE = "md-to-pdf-preview";
 
@@ -117,8 +116,7 @@ export class PdfPreviewView extends ItemView {
 		const seq = ++this.renderSeq;
 		this.setStatus(`Rendering ${file.basename}…`);
 		try {
-			const html = await this.plugin.buildNoteDocument(file, undefined, { showBaselineGrid: this.showGrid, showMargins: this.showMargins });
-			const pdf = await printHtmlToPdf(html, this.plugin.settings, file.basename);
+			const pdf = await this.plugin.printNote(file, undefined, { showBaselineGrid: this.showGrid, showMargins: this.showMargins });
 			if (seq !== this.renderSeq) return; // a newer render has started
 			this.showPdf(pdf);
 			this.setStatus("");

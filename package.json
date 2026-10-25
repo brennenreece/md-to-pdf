@@ -17,6 +17,7 @@
     "typescript": "^5.4.5"
   },
   "dependencies": {
+    "pdf-lib": "^1.17.1",
     "typograf": "7.8.0"
   }
 }

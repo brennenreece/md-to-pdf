@@ -68,6 +68,16 @@ Put `<align: VALUE>` on its own line to set the text alignment for the content a
 
 Columns and alignment can nest in any order. Several start tokens can share one line, such as `<columns: 2><align: left>`. For example, `<align: center>` inside a `<columns: 2>` region centers the text in one column. Each closing token closes the innermost open region of its kind. If a closing token would cross another open region, it is left as written.
 
+### Page numbering
+
+Put `<page-numbering ...>` on its own line to start a new numbering group from that point on. Each group is printed as its own section and merged into one PDF, so its numbers restart correctly.
+
+- `<page-numbering section: 1 type: i start: 1>` starts a group. `type` is `1` (arabic), `i`, `I`, `a`, or `A`. `start` is the number of the group's first page. Omit `start` to continue the count from the previous page. Omit `type` to keep the previous style. `section:` labels the group and does not change numbering.
+- `<page-numbering none>` hides page numbers from that point on.
+- `<page-numbering on>` shows them again.
+
+`{pages}` in the page number format is the total for the current group, not the whole note. Lines inside code blocks are not changed. Invalid markers are left as written.
+
 ### Tables
 
 The **Table** section sets fills and rules for the whole table:
