@@ -1,6 +1,6 @@
 {
   "name": "obsidian-md-to-pdf",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Export Obsidian notes to styled PDFs with a live preview pane.",
   "main": "main.js",
   "scripts": {
