@@ -60,13 +60,13 @@ Put `<linespace N unit>` on its own line to add an empty space of that height, f
 
 ### Columns
 
-Put `<columns: N>` on its own line to start a multi-column region, where N is 1 to 6, and `<endcolumns>` on its own line to end it. Content in between flows into N columns in both the preview and the PDF. An unclosed `<columns: N>` runs to the end of the note. Lines inside code blocks are not changed.
+Put `<columns: N>` on its own line to start a multi-column region, where N is 1 to 6, and `</columns>` on its own line to end it. Content in between flows into N columns in both the preview and the PDF. An unclosed `<columns: N>` runs to the end of the note. Lines inside code blocks are not changed.
 
 ### Alignment
 
-Put `<align: VALUE>` on its own line to set the text alignment for the content after it, and `<endalign>` on its own line to end it. VALUE is `left`, `right`, `center`, or `justified`. An unclosed `<align: VALUE>` runs to the end of the note. Lines inside code blocks are not changed.
+Put `<align: VALUE>` on its own line to set the text alignment for the content after it, and `</align>` on its own line to end it. VALUE is `left`, `right`, `center`, or `justified`. An unclosed `<align: VALUE>` runs to the end of the note. Lines inside code blocks are not changed.
 
-Columns and alignment can nest in any order. Several start tokens can share one line, such as `<columns: 2><align: left>`. For example, `<align: center>` inside a `<columns: 2>` region centers the text in one column. Each end token closes the innermost open region of its kind. If an end token would cross another open region, it is left as written.
+Columns and alignment can nest in any order. Several start tokens can share one line, such as `<columns: 2><align: left>`. For example, `<align: center>` inside a `<columns: 2>` region centers the text in one column. Each closing token closes the innermost open region of its kind. If a closing token would cross another open region, it is left as written.
 
 ### Tables
 

@@ -14,7 +14,7 @@ export interface RegionRule {
  * end of the note are closed there. Blank lines around each wrapper keep the
  * content parsed as markdown.
  */
-const MARKER_RE = /<\/?(?:columns|endcolumns|align|endalign)\b[^>]*>/gi;
+const MARKER_RE = /<\/?(?:columns|align)\b[^>]*>/gi;
 
 /**
  * Returns each region marker on the line, or null if the line holds anything

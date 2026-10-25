@@ -1,7 +1,7 @@
 import type { RegionRule } from "./regions";
 
 const ALIGN_RE = /^\s*<align:\s*(left|right|center|justified)\s*>\s*$/i;
-const END_ALIGN_RE = /^\s*<endalign\s*>\s*$/i;
+const END_ALIGN_RE = /^\s*<\/align\s*>\s*$/i;
 
 const TEXT_ALIGN: Record<string, string> = {
 	left: "left",
@@ -10,7 +10,7 @@ const TEXT_ALIGN: Record<string, string> = {
 	justified: "justify",
 };
 
-/** Rule for `<align: VALUE>` … `<endalign>`, which sets the text alignment of the content. */
+/** Rule for `<align: VALUE>` … `</align>`, which sets the text alignment of the content. */
 export const ALIGN_RULE: RegionRule = {
 	open: (line) => {
 		const m = ALIGN_RE.exec(line);

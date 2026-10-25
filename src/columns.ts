@@ -1,10 +1,10 @@
 import type { RegionRule } from "./regions";
 
 const COLUMNS_RE = /^\s*<columns:\s*(\d+)\s*>\s*$/i;
-const END_COLUMNS_RE = /^\s*<endcolumns\s*>\s*$/i;
+const END_COLUMNS_RE = /^\s*<\/columns\s*>\s*$/i;
 const MAX_COLUMNS = 6;
 
-/** Rule for `<columns: N>` … `<endcolumns>`, which wraps the content in an N-column block. */
+/** Rule for `<columns: N>` … `</columns>`, which wraps the content in an N-column block. */
 export const COLUMNS_RULE: RegionRule = {
 	open: (line) => {
 		const m = COLUMNS_RE.exec(line);
