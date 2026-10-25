@@ -66,6 +66,8 @@ Put `<columns: N>` on its own line to start a multi-column region, where N is 1 
 
 Put `<align: VALUE>` on its own line to set the text alignment for the content after it, and `<endalign>` on its own line to end it. VALUE is `left`, `right`, `center`, or `justified`. An unclosed `<align: VALUE>` runs to the end of the note. Lines inside code blocks are not changed.
 
+Columns and alignment can nest in any order. For example, `<align: center>` inside a `<columns: 2>` region centers the text in one column. Each end token closes the innermost open region of its kind. If an end token would cross another open region, it is left as written.
+
 ### Tables
 
 The **Table** section sets fills and rules for the whole table:

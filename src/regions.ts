@@ -1,19 +1,21 @@
 export interface RegionRule {
-	/** Matches a line that opens the region. Return the wrapper HTML, or null to skip the line. */
+	/** Returns the wrapper HTML if the line opens this kind of region, otherwise null. */
 	open: (line: string) => string | null;
-	/** Matches a line that closes the region. */
+	/** Matches a line that closes this kind of region. */
 	close: RegExp;
 	closeHtml: string;
 }
 
 /**
- * Replaces open/close marker lines with wrapper HTML, using a separate state for
- * each rule. Lines inside code fences are left alone, and a region that is still
- * open at the end of the note is closed there. Blank lines around the wrapper
- * keep the content parsed as markdown.
+ * Replaces open/close marker lines with wrapper HTML. Regions of any kind can
+ * nest, using one stack. A close marker only applies when it matches the
+ * innermost open region, so it stays unchanged if it would cross another open
+ * region. Lines inside code fences are left alone, and regions still open at the
+ * end of the note are closed there. Blank lines around each wrapper keep the
+ * content parsed as markdown.
  */
 export function wrapRegions(markdown: string, rules: RegionRule[]): string {
-	const open: boolean[] = rules.map(() => false);
+	const stack: { rule: RegionRule }[] = [];
 	let fence: string | null = null;
 	const out: string[] = [];
 	for (const line of markdown.split("\n")) {
@@ -29,26 +31,27 @@ export function wrapRegions(markdown: string, rules: RegionRule[]): string {
 			out.push(line);
 			continue;
 		}
+		const top = stack[stack.length - 1];
+		if (top && top.rule.close.test(line)) {
+			stack.pop();
+			out.push("", top.rule.closeHtml, "");
+			continue;
+		}
 		let handled = false;
-		for (let i = 0; i < rules.length && !handled; i++) {
-			const rule = rules[i];
-			if (!open[i]) {
-				const html = rule.open(line);
-				if (html !== null) {
-					open[i] = true;
-					out.push("", html, "");
-					handled = true;
-				}
-			} else if (rule.close.test(line)) {
-				open[i] = false;
-				out.push("", rule.closeHtml, "");
+		for (const rule of rules) {
+			const html = rule.open(line);
+			if (html !== null) {
+				stack.push({ rule });
+				out.push("", html, "");
 				handled = true;
+				break;
 			}
 		}
 		if (!handled) out.push(line);
 	}
-	for (let i = 0; i < rules.length; i++) {
-		if (open[i]) out.push("", rules[i].closeHtml, "");
+	while (stack.length > 0) {
+		const { rule } = stack.pop()!;
+		out.push("", rule.closeHtml, "");
 	}
 	return out.join("\n");
 }
