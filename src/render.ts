@@ -1,6 +1,7 @@
 import { App, Component, MarkdownRenderer } from "obsidian";
 import { applyTypograf } from "./nbsp";
 import { expandColumns } from "./columns";
+import { expandAlign } from "./align";
 
 const SETTLE_QUIET_MS = 400;
 
@@ -56,7 +57,7 @@ export async function renderNoteToHtml(
 	child.load();
 
 	try {
-		await MarkdownRenderer.render(app, expandColumns(expandLinespaces(markdown)), host, sourcePath, child);
+		await MarkdownRenderer.render(app, expandAlign(expandColumns(expandLinespaces(markdown))), host, sourcePath, child);
 		await waitForSettled(host);
 		await captureCanvases(host);
 		await inlineImages(host);
