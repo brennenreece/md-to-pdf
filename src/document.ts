@@ -63,7 +63,9 @@ export function contentCss(s: MdToPdfSettings, styles: ParagraphStyles): string 
 }
 .md2pdf-root .md2pdf-linespace { display: block !important; margin: 0 !important; padding: 0 !important; border: 0 !important; }
 .md2pdf-root .md2pdf-columns { column-gap: 2em; column-fill: balance; }
-.md2pdf-root .md2pdf-columns > :first-child { margin-top: 0 !important; }
+.md2pdf-root .md2pdf-columns > :first-child,
+.md2pdf-root .md2pdf-columns > :first-child > :first-child,
+.md2pdf-root .md2pdf-align:first-child > :first-child { margin-top: 0 !important; }
 .md2pdf-root img, .md2pdf-root svg { max-width: 100% !important; height: auto !important; }
 .md2pdf-root svg { display: block !important; visibility: visible !important; opacity: 1 !important; }
 .md2pdf-root .block-language-brnotation,
