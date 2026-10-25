@@ -13,7 +13,7 @@ const TYPE_STYLES: Record<string, PageNumberStyle> = {
 export const SECTION_SENTINEL = "MD2PDFSECTIONBREAK";
 
 const MARKER_RE = /^\s*<page-numbering\b([^>]*)>\s*$/i;
-const SENTINEL_PARAGRAPH_RE = new RegExp(`<p[^>]*>\\s*${SECTION_SENTINEL}\\s*</p>`, "g");
+const SENTINEL_RE = new RegExp(`(?:<p[^>]*>\\s*)?${SECTION_SENTINEL}(?:\\s*</p>)?`, "g");
 
 export interface PageNumberingMarker {
 	/**
@@ -97,7 +97,7 @@ export function markSectionBreaks(markdown: string): { markdown: string; markers
  * first marker plus one per marker, or null if the sentinel count does not match.
  */
 export function splitRenderedSections(html: string, markerCount: number): string[] | null {
-	const parts = html.split(SENTINEL_PARAGRAPH_RE);
+	const parts = html.split(SENTINEL_RE);
 	return parts.length === markerCount + 1 ? parts : null;
 }
 
