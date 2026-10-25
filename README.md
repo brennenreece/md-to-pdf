@@ -58,6 +58,10 @@ Smart quotes are on by default. They turn straight double quotes into curly ones
 
 Put `<linespace N unit>` on its own line to add an empty space of that height, for example `<linespace 2 em>` or `<linespace 0.5 in>`. Angle brackets are used because square brackets become links in Obsidian. Units are em, in, pt, pc, cm, or mm. The space shows in both the preview and the PDF. Lines inside code blocks are not changed.
 
+### Columns
+
+Put `{columns:N}` on its own line to start a multi-column region, where N is 1 to 6, and `{endcolumns}` on its own line to end it. Content in between flows into N columns in both the preview and the PDF. An unclosed `{columns:N}` runs to the end of the note. Lines inside code blocks are not changed.
+
 ### Tables
 
 The **Table** section sets fills and rules for the whole table:
