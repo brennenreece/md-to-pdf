@@ -60,7 +60,7 @@ Put `<linespace N unit>` on its own line to add an empty space of that height, f
 
 ### Columns
 
-Put `{columns:N}` on its own line to start a multi-column region, where N is 1 to 6, and `{endcolumns}` on its own line to end it. Content in between flows into N columns in both the preview and the PDF. An unclosed `{columns:N}` runs to the end of the note. Lines inside code blocks are not changed.
+Put `<columns: N>` on its own line to start a multi-column region, where N is 1 to 6, and `<endcolumns>` on its own line to end it. Content in between flows into N columns in both the preview and the PDF. An unclosed `<columns: N>` runs to the end of the note. Lines inside code blocks are not changed.
 
 ### Tables
 

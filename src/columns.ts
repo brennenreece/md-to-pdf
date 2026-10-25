@@ -1,5 +1,5 @@
-const COLUMNS_RE = /^\s*\{columns:(\d+)\}\s*$/;
-const END_COLUMNS_RE = /^\s*\{endcolumns\}\s*$/;
+const COLUMNS_RE = /^\s*<columns:\s*(\d+)\s*>\s*$/i;
+const END_COLUMNS_RE = /^\s*<endcolumns\s*>\s*$/i;
 const MAX_COLUMNS = 6;
 
 /**
