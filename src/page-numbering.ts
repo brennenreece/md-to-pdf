@@ -16,15 +16,12 @@ const MARKER_RE = /^\s*<page-numbering\b([^>]*)>\s*$/i;
 const SENTINEL_RE = new RegExp(`(?:<p[^>]*>\\s*)?${SECTION_SENTINEL}(?:\\s*</p>)?`, "g");
 
 export interface PageNumberingMarker {
-	/**
-	 * `section` starts a numbering group, which can change the start, style, or both.
-	 * `hide` and `show` only change whether numbers print.
-	 */
-	kind: "section" | "hide" | "show";
 	/** Page number that the group starts at. Null means continue the previous count. */
 	start: number | null;
 	/** Number style for the group. Null means keep the previous style. */
 	style: PageNumberStyle | null;
+	/** Whether numbers print from this group on. Null means keep the previous setting. */
+	numbers: boolean | null;
 }
 
 /** Numbering state carried from one printed section to the next. */
@@ -36,17 +33,16 @@ export interface NumberingState {
 }
 
 /**
- * Reads the attributes of a `<page-numbering ...>` marker. Returns null when they are invalid.
- * `section:` labels a group and does not change numbering.
+ * Reads the parameters of a `<page-numbering ...>` marker. Returns null when they are invalid.
+ * `section:` labels a group and does not change numbering. `numbers: hide` hides page numbers
+ * and `numbers: show` shows them. All parameters use the same `key: value` form.
  */
 export function parsePageNumberingAttrs(attrs: string): PageNumberingMarker | null {
 	const text = attrs.trim();
 	if (text === "") return null;
-	if (/^none$/i.test(text)) return { kind: "hide", start: null, style: null };
-	if (/^on$/i.test(text)) return { kind: "show", start: null, style: null };
 
-	const marker: PageNumberingMarker = { kind: "section", start: null, style: null };
-	const re = /(section|type|start)\s*:\s*(\S+)/gi;
+	const marker: PageNumberingMarker = { start: null, style: null, numbers: null };
+	const re = /(section|type|start|numbers)\s*:\s*(\S+)/gi;
 	let found = false;
 	let m: RegExpExecArray | null;
 	while ((m = re.exec(text)) !== null) {
@@ -61,9 +57,15 @@ export function parsePageNumberingAttrs(attrs: string): PageNumberingMarker | nu
 			const style = TYPE_STYLES[value] ?? TYPE_STYLES[value.toLowerCase()];
 			if (!style) return null;
 			marker.style = style;
+		} else if (key === "numbers") {
+			const v = value.toLowerCase();
+			if (v !== "show" && v !== "hide") return null;
+			marker.numbers = v === "show";
 		}
 	}
-	return found ? marker : null;
+	// Anything that is not a recognized parameter makes the whole marker invalid.
+	if (!found || text.replace(re, "").trim() !== "") return null;
+	return marker;
 }
 
 /**
@@ -110,6 +112,6 @@ export function applyMarker(state: NumberingState, marker: PageNumberingMarker |
 	return {
 		next: marker.start ?? state.next,
 		style: marker.style ?? state.style,
-		hidden: marker.kind === "hide" ? true : marker.kind === "show" ? false : state.hidden,
+		hidden: marker.numbers === null ? state.hidden : !marker.numbers,
 	};
 }

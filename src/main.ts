@@ -5,7 +5,7 @@ import { buildDocumentHtml } from "./document";
 import { buildBundledFontFaces, fontKeysInUse } from "./fonts";
 import type { SavedTheme } from "./themes";
 import { DEFAULT_PARAGRAPH_STYLES, ParagraphStyles, stylesFromFlatSettings, withMissingStyles } from "./paragraph-styles";
-import { mergePdfs, pdfPageCount, printHtmlToPdf } from "./pdf";
+import { applyPageLabels, mergePdfs, PageLabelRange, pdfPageCount, printHtmlToPdf } from "./pdf";
 import { applyMarker, markSectionBreaks, splitRenderedSections, NumberingState, PageNumberingMarker } from "./page-numbering";
 import { PdfPreviewView, PREVIEW_VIEW_TYPE } from "./preview-view";
 
@@ -180,10 +180,13 @@ export default class MdToPdfPlugin extends Plugin {
 			return printHtmlToPdf(html, settings, file.basename);
 		}
 		const parts: ArrayBuffer[] = [];
+		const labels: PageLabelRange[] = [];
+		let mergedIndex = 0;
 		let state: NumberingState = { next: 1, style: settings.pageNumberStyle, hidden: false };
 		for (let i = 0; i < bodies.length; i++) {
 			// Body i+1 follows marker i. The first body uses the document defaults.
 			state = applyMarker(state, i === 0 ? null : markers[i - 1]);
+			labels.push({ startIndex: mergedIndex, start: state.next, style: state.style });
 			const html = buildDocumentHtml({
 				title: file.basename,
 				bodyHtml: bodies[i],
@@ -197,9 +200,11 @@ export default class MdToPdfPlugin extends Plugin {
 			});
 			const part = await printHtmlToPdf(html, settings, file.basename);
 			parts.push(part);
-			state = { ...state, next: state.next + (await pdfPageCount(part)) };
+			const count = await pdfPageCount(part);
+			mergedIndex += count;
+			state = { ...state, next: state.next + count };
 		}
-		return mergePdfs(parts);
+		return applyPageLabels(await mergePdfs(parts), labels);
 	}
 
 	async exportFile(file: TFile) {

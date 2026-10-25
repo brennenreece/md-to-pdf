@@ -1,6 +1,6 @@
 import type { MdToPdfSettings } from "./settings";
 import { headerFooterTemplates } from "./document";
-import { PDFDocument } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber } from "pdf-lib";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -84,5 +84,40 @@ export async function mergePdfs(parts: ArrayBuffer[]): Promise<ArrayBuffer> {
 		for (const page of pages) out.addPage(page);
 	}
 	const bytes = await out.save();
+	return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+/** A run of pages in the merged PDF that share one page label. */
+export interface PageLabelRange {
+	/** Index of the first page of the range in the merged PDF. */
+	startIndex: number;
+	/** Number shown on that first page. */
+	start: number;
+	/** Counter style: arabic, lower-roman, upper-roman, lower-alpha, or upper-alpha. */
+	style: "arabic" | "lower-roman" | "upper-roman" | "lower-alpha" | "upper-alpha";
+}
+
+/** Sets the PDF's page labels, so viewers number each range from its own start and style. */
+export async function applyPageLabels(pdf: ArrayBuffer, ranges: PageLabelRange[]): Promise<ArrayBuffer> {
+	const doc = await PDFDocument.load(pdf, { ignoreEncryption: true });
+	const styleCode: Record<PageLabelRange["style"], string> = {
+		arabic: "D",
+		"lower-roman": "r",
+		"upper-roman": "R",
+		"lower-alpha": "a",
+		"upper-alpha": "A",
+	};
+	const nums = PDFArray.withContext(doc.context);
+	for (const range of ranges) {
+		const dict = PDFDict.withContext(doc.context);
+		dict.set(PDFName.of("S"), PDFName.of(styleCode[range.style]));
+		dict.set(PDFName.of("St"), PDFNumber.of(range.start));
+		nums.push(PDFNumber.of(range.startIndex));
+		nums.push(dict);
+	}
+	const labels = PDFDict.withContext(doc.context);
+	labels.set(PDFName.of("Nums"), nums);
+	doc.catalog.set(PDFName.of("PageLabels"), doc.context.register(labels));
+	const bytes = await doc.save();
 	return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }

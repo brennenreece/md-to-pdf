@@ -73,8 +73,8 @@ Columns and alignment can nest in any order. Several start tokens can share one 
 Put `<page-numbering ...>` on its own line to start a new numbering group from that point on. Each group is printed as its own section and merged into one PDF, so its numbers restart correctly.
 
 - `<page-numbering section: 1 type: i start: 1>` starts a group. `type` is `1` (arabic), `i`, `I`, `a`, or `A`. `start` is the number of the group's first page. Omit `start` to continue the count from the previous page. Omit `type` to keep the previous style. `section:` labels the group and does not change numbering.
-- `<page-numbering none>` hides page numbers from that point on.
-- `<page-numbering on>` shows them again.
+- `<page-numbering numbers: hide>` hides page numbers from that point on.
+- `<page-numbering numbers: show>` shows them again.
 
 `{pages}` in the page number format is the total for the current group, not the whole note. Lines inside code blocks are not changed. Invalid markers are left as written.
 
