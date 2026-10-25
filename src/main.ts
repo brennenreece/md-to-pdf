@@ -6,7 +6,7 @@ import { buildBundledFontFaces, fontKeysInUse } from "./fonts";
 import type { SavedTheme } from "./themes";
 import { DEFAULT_PARAGRAPH_STYLES, ParagraphStyles, stylesFromFlatSettings, withMissingStyles } from "./paragraph-styles";
 import { applyPageLabels, mergePdfs, PageLabelRange, pdfPageCount, printHtmlToPdf } from "./pdf";
-import { applyMarker, markSectionBreaks, splitRenderedSections, NumberingState, PageNumberingMarker } from "./page-numbering";
+import { applyMarker, hasVisibleContent, markSectionBreaks, splitRenderedSections, NumberingState, PageNumberingMarker } from "./page-numbering";
 import { PdfPreviewView, PREVIEW_VIEW_TYPE } from "./preview-view";
 
 const FRONTMATTER_RE = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/;
@@ -186,6 +186,9 @@ export default class MdToPdfPlugin extends Plugin {
 		for (let i = 0; i < bodies.length; i++) {
 			// Body i+1 follows marker i. The first body uses the document defaults.
 			state = applyMarker(state, i === 0 ? null : markers[i - 1]);
+			// A section with no content, such as text before a marker on the first line, prints nothing.
+			// Its marker still applies to the sections after it.
+			if (!hasVisibleContent(bodies[i])) continue;
 			labels.push({ startIndex: mergedIndex, start: state.next, style: state.style });
 			const html = buildDocumentHtml({
 				title: file.basename,

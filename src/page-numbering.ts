@@ -115,3 +115,9 @@ export function applyMarker(state: NumberingState, marker: PageNumberingMarker |
 		hidden: marker.numbers === null ? state.hidden : !marker.numbers,
 	};
 }
+
+/** True when rendered HTML has any text or media, not just whitespace or empty tags. */
+export function hasVisibleContent(html: string): boolean {
+	const text = html.replace(/<[^>]*>/g, "").replace(/&nbsp;|&#160;/g, " ").trim();
+	return text.length > 0 || /<(img|svg|canvas|hr|table|iframe)\b/i.test(html);
+}
