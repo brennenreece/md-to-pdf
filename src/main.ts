@@ -194,6 +194,9 @@ export default class MdToPdfPlugin extends Plugin {
 			adapter: this.app.vault.adapter,
 			pluginDir: this.manifest.dir ?? "",
 		});
+		if (mergedPages.size < ids.length) {
+			console.warn("[md-to-pdf toc] pages found for", mergedPages.size, "of", ids.length, "headings", { ids, found: [...mergedPages.keys()] });
+		}
 		// Convert merged page indices to printed numbers, using each section's start and style.
 		const pages = new Map<string, number>();
 		for (const [id, index] of mergedPages) pages.set(id, printedNumber(first.labels, index));
