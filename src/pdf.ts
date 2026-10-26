@@ -122,11 +122,13 @@ export async function applyPageLabels(pdf: ArrayBuffer, ranges: PageLabelRange[]
 	return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-/** File URL of pdf.worker.mjs, which the build copies next to main.js in the plugin folder. */
-function pdfWorkerUrl(): string {
-	const path = require("path") as typeof import("path");
-	const url = require("url") as typeof import("url");
-	return url.pathToFileURL(path.join(__dirname, "pdf.worker.mjs")).href;
+/**
+ * Blob URL for pdf.worker.mjs, read from the plugin folder through the vault adapter. Obsidian's
+ * own folder is not where the plugin lives, so `__dirname` cannot be used.
+ */
+async function pdfWorkerBlobUrl(adapter: { readBinary(path: string): Promise<ArrayBuffer> }, pluginDir: string): Promise<string> {
+	const bytes = await adapter.readBinary(`${pluginDir}/pdf.worker.mjs`);
+	return URL.createObjectURL(new Blob([bytes], { type: "text/javascript" }));
 }
 
 /**
@@ -134,9 +136,13 @@ function pdfWorkerUrl(): string {
  * so the result is the heading's printed page. Returns a map from marker to 1-based page number.
  * pdf.js is loaded on demand, so it only costs time for notes that use a table of contents.
  */
-export async function findMarkerPages(pdf: ArrayBuffer, markers: string[]): Promise<Map<string, number>> {
+export async function findMarkerPages(
+	pdf: ArrayBuffer,
+	markers: string[],
+	worker: { adapter: { readBinary(path: string): Promise<ArrayBuffer> }; pluginDir: string },
+): Promise<Map<string, number>> {
 	const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-	pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl();
+	pdfjs.GlobalWorkerOptions.workerSrc = await pdfWorkerBlobUrl(worker.adapter, worker.pluginDir);
 	const found = new Map<string, number>();
 	const wanted = new Set(markers);
 	const doc = await pdfjs.getDocument({ data: new Uint8Array(pdf), disableFontFace: true, isEvalSupported: false } as any).promise;

@@ -190,7 +190,10 @@ export default class MdToPdfPlugin extends Plugin {
 		if (first.tocCount === 0) return first.pdf;
 		// Pass 1 gave each heading a marker. Read the marker pages back, then print again with real numbers.
 		const ids = first.entries.map((e) => e.id);
-		const mergedPages = await findMarkerPages(first.pdf, ids);
+		const mergedPages = await findMarkerPages(first.pdf, ids, {
+			adapter: this.app.vault.adapter,
+			pluginDir: this.manifest.dir ?? "",
+		});
 		// Convert merged page indices to printed numbers, using each section's start and style.
 		const pages = new Map<string, number>();
 		for (const [id, index] of mergedPages) pages.set(id, printedNumber(first.labels, index));
