@@ -9,6 +9,9 @@ import type { LengthUnit } from "./length";
 
 export type StyleId =
 	| "body"
+	| "level1"
+	| "level2"
+	| "level3"
 	| "h1"
 	| "h2"
 	| "h3"
@@ -121,6 +124,9 @@ export const DEFAULT_TABLE_STYLE: TableStyle = {
 /** Display order and labels for the styles panel. */
 export const STYLE_ORDER: StyleId[] = [
 	"body",
+	"level1",
+	"level2",
+	"level3",
 	"h1",
 	"h2",
 	"h3",
@@ -143,6 +149,9 @@ export const STYLE_ORDER: StyleId[] = [
 
 export const STYLE_NAMES: Record<StyleId, string> = {
 	body: "Body",
+	level1: "Table of contents level 1",
+	level2: "Table of contents level 2",
+	level3: "Table of contents level 3",
 	h1: "H1",
 	h2: "H2",
 	h3: "H3",
@@ -209,6 +218,9 @@ function minorHeading(id: StyleId, name: string, sizeRatio: number): ParagraphSt
 /** Built-in styles. Each one is editable. None can be deleted. */
 export const DEFAULT_PARAGRAPH_STYLES: ParagraphStyles = {
 	body: { id: "body", name: STYLE_NAMES.body, basedOn: null, props: { ...BODY_PROPS } },
+	level1: { id: "level1", name: STYLE_NAMES.level1, basedOn: "body", props: { weight: 700 } },
+	level2: { id: "level2", name: STYLE_NAMES.level2, basedOn: "body", props: {} },
+	level3: { id: "level3", name: STYLE_NAMES.level3, basedOn: "body", props: { sizePt: 10 } },
 	h1: heading("h1", STYLE_NAMES.h1, { sizePt: 22, lineHeight: 1, lineHeightUnit: "em", pageBreakBefore: false }),
 	h2: heading("h2", STYLE_NAMES.h2, { sizePt: 16, lineHeight: 1, lineHeightUnit: "em" }),
 	h3: heading("h3", STYLE_NAMES.h3, { sizePt: 13, lineHeight: 1, lineHeightUnit: "em" }),

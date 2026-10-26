@@ -12,6 +12,9 @@ export interface StyleCssOptions {
 /** Selector for the element each style is applied to. */
 const SELECTORS: Record<StyleId, string> = {
 	body: ".md2pdf-root",
+	level1: ".md2pdf-root .md2pdf-toc-level-1",
+	level2: ".md2pdf-root .md2pdf-toc-level-2",
+	level3: ".md2pdf-root .md2pdf-toc-level-3",
 	h1: ".md2pdf-root h1",
 	h2: ".md2pdf-root h2",
 	h3: ".md2pdf-root h3",
@@ -226,6 +229,12 @@ ${declarations(body, grid, true)}
 	// so the default output does not change.
 	for (const id of ["link", "bold", "italic", "table", "hr", "callout", "image", "footnote"] as const) {
 		if (Object.keys(styles[id].props).length === 0) continue;
+		const { props } = resolveStyle(styles, id);
+		parts.push(`${SELECTORS[id]} {\n${declarations(props, grid, true)}\n}`);
+	}
+
+	// Table of contents level styles only apply to the entries in the TOC block. Body headings are unaffected.
+	for (const id of ["level1", "level2", "level3"] as const) {
 		const { props } = resolveStyle(styles, id);
 		parts.push(`${SELECTORS[id]} {\n${declarations(props, grid, true)}\n}`);
 	}

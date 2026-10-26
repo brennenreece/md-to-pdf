@@ -72,6 +72,8 @@ Columns and alignment can nest in any order. Several start tokens can share one 
 
 Put `<toc>` on its own line where the table of contents should go. It lists the headings in the note, from the levels set under **Table of contents** in the settings (H1–H2 by default, or H1–H3, or all levels). Each entry links to its heading, and shows its page with dot leaders when page numbers are on.
 
+Three **Table of contents level** styles (Level 1, 2, 3) in the Styles panel set the font for TOC entries. Level 1 is used for H1 headings, level 2 for H2, and level 3 for H3. They apply only to the table of contents, and body headings keep their H1–H6 styles.
+
 Making the table of contents takes two print passes, so export is slower for notes that use `<toc>`. Notes with no `<toc>` are unchanged.
 
 If the note has no `<page-numbering>` markers of its own, the table of contents is numbered as front matter: lowercase roman up to the table of contents, then the body restarting at 1. A note with its own markers keeps exactly what those markers say.
