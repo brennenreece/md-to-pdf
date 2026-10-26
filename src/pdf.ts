@@ -148,7 +148,7 @@ export async function findMarkerPages(
 	const doc = await pdfjs.getDocument({ data: new Uint8Array(pdf), disableFontFace: true, isEvalSupported: false } as any).promise;
 	for (let i = 1; i <= doc.numPages; i++) {
 		const content = await (await doc.getPage(i)).getTextContent();
-		const text = content.items.map((item: any) => item.str).join("|");
+		const text = content.items.map((item: any) => item.str).join("");
 		for (const m of text.match(/md2pdf-h-\d+/g) ?? []) {
 			if (wanted.has(m) && !found.has(m)) found.set(m, i);
 		}
