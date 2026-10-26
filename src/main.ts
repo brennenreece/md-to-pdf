@@ -1,11 +1,12 @@
 import { Component, Notice, Platform, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { DEFAULT_SETTINGS, MdToPdfSettings, MdToPdfSettingTab } from "./settings";
-import { renderNoteToHtml, collectAppCss, collectThemeCss } from "./render";
+import { renderNoteToHtml, collectAppCss, collectThemeCss, HeadingInfo } from "./render";
 import { buildDocumentHtml } from "./document";
 import { buildBundledFontFaces, fontKeysInUse } from "./fonts";
 import type { SavedTheme } from "./themes";
 import { DEFAULT_PARAGRAPH_STYLES, ParagraphStyles, stylesFromFlatSettings, withMissingStyles } from "./paragraph-styles";
-import { applyPageLabels, mergePdfs, PageLabelRange, pdfPageCount, printHtmlToPdf } from "./pdf";
+import { applyPageLabels, findMarkerPages, mergePdfs, PageLabelRange, pdfPageCount, printHtmlToPdf } from "./pdf";
+import { markTocPlacements, printedNumber, tocHtml, tocLevelRange, TOC_SENTINEL, TocEntry } from "./toc";
 import { applyMarker, hasVisibleContent, markSectionBreaks, splitRenderedSections, NumberingState, PageNumberingMarker } from "./page-numbering";
 import { PdfPreviewView, PREVIEW_VIEW_TYPE } from "./preview-view";
 
@@ -112,18 +113,38 @@ export default class MdToPdfPlugin extends Plugin {
 	async renderNoteSections(
 		file: TFile,
 		settings: MdToPdfSettings,
-	): Promise<{ bodies: string[]; markers: PageNumberingMarker[]; fontFaceCss: string; appCss: string }> {
+		pages: Map<string, number> | null = null,
+	): Promise<{ bodies: string[]; markers: PageNumberingMarker[]; fontFaceCss: string; appCss: string; entries: TocEntry[]; tocCount: number }> {
 		const raw = await this.app.vault.read(file);
 		const source = raw.replace(FRONTMATTER_RE, "");
-		const { markdown, markers } = markSectionBreaks(source);
+		// A note with a TOC and no page-numbering markers of its own gets the book convention:
+		// front matter in lowercase roman up to the TOC, then the body restarting at 1.
+		const hasOwnMarkers = /^\s*<page-numbering\b/im.test(source);
+		const tocOnly = !hasOwnMarkers && /^\s*<toc>\s*$/im.test(source);
+		const prepared = tocOnly
+			? source.replace(/^(\s*)<toc>(\s*)$/im, `$1<page-numbering type: i start: 1>$2\n<toc>$2\n<page-numbering type: 1 start: 1>$2`)
+			: source;
+		const numbered = markSectionBreaks(prepared);
+		const toc = markTocPlacements(numbered.markdown);
+		const markers = numbered.markers;
 		const owner = new Component();
 		owner.load();
 		try {
-			const renderedHtml = await renderNoteToHtml(this.app, markdown, file.path, owner, {
+			let headings: HeadingInfo[] = [];
+			const renderedHtml = await renderNoteToHtml(this.app, toc.markdown, file.path, owner, {
 				nonBreakingSpaces: settings.nonBreakingSpaces,
 				smartQuotes: settings.smartQuotes,
+				collectHeadings: (entries) => (headings = entries),
+				// Markers are only needed for pass 1, to find each heading's page.
+				markHeadings: toc.count > 0 && pages === null,
 			});
-			const bodies = markers.length ? splitRenderedSections(renderedHtml, markers.length) : [renderedHtml];
+			const [lo, hi] = tocLevelRange(settings.tocLevels);
+			const entries: TocEntry[] = headings
+				.filter((h) => h.level >= lo && h.level <= hi)
+				.map((h) => ({ level: h.level, text: h.text, id: h.id, page: pages?.get(h.id) ?? null }));
+			const tocBlock = toc.count > 0 ? tocHtml(entries, settings.tocShowNumbers) : "";
+			const withToc = renderedHtml.replace(new RegExp(`<p[^>]*>\\s*${TOC_SENTINEL}\\s*</p>|${TOC_SENTINEL}`, "g"), tocBlock);
+			const bodies = markers.length ? splitRenderedSections(withToc, markers.length) : [withToc];
 			if (!bodies) throw new Error("Page numbering markers could not be matched in the rendered note.");
 			const fontFaceCss = await buildBundledFontFaces(
 				this.app.vault.adapter,
@@ -131,7 +152,7 @@ export default class MdToPdfPlugin extends Plugin {
 				fontKeysInUse(this.styles),
 			);
 			const appCss = collectAppCss() + "\n" + (await collectThemeCss(this.app));
-			return { bodies, markers, fontFaceCss, appCss };
+			return { bodies, markers, fontFaceCss, appCss, entries, tocCount: toc.count };
 		} finally {
 			owner.unload();
 		}
@@ -165,7 +186,25 @@ export default class MdToPdfPlugin extends Plugin {
 		settings: MdToPdfSettings = this.settings,
 		opts: { showBaselineGrid?: boolean; showMargins?: boolean } = {},
 	): Promise<ArrayBuffer> {
-		const { bodies, markers, fontFaceCss, appCss } = await this.renderNoteSections(file, settings);
+		const first = await this.printSections(file, settings, opts, null);
+		if (first.tocCount === 0) return first.pdf;
+		// Pass 1 gave each heading a marker. Read the marker pages back, then print again with real numbers.
+		const ids = first.entries.map((e) => e.id);
+		const mergedPages = await findMarkerPages(first.pdf, ids);
+		// Convert merged page indices to printed numbers, using each section's start and style.
+		const pages = new Map<string, number>();
+		for (const [id, index] of mergedPages) pages.set(id, printedNumber(first.labels, index));
+		return (await this.printSections(file, settings, opts, pages)).pdf;
+	}
+
+	/** Prints the note's numbering sections and merges them. Returns the PDF and the TOC info. */
+	async printSections(
+		file: TFile,
+		settings: MdToPdfSettings,
+		opts: { showBaselineGrid?: boolean; showMargins?: boolean },
+		pages: Map<string, number> | null,
+	): Promise<{ pdf: ArrayBuffer; entries: TocEntry[]; tocCount: number; labels: PageLabelRange[] }> {
+		const { bodies, markers, fontFaceCss, appCss, entries, tocCount } = await this.renderNoteSections(file, settings, pages);
 		if (markers.length === 0) {
 			const html = buildDocumentHtml({
 				title: file.basename,
@@ -177,7 +216,7 @@ export default class MdToPdfPlugin extends Plugin {
 				showBaselineGrid: opts.showBaselineGrid,
 				showMargins: opts.showMargins,
 			});
-			return printHtmlToPdf(html, settings, file.basename);
+			return { pdf: await printHtmlToPdf(html, settings, file.basename), entries, tocCount, labels: [] };
 		}
 		const parts: ArrayBuffer[] = [];
 		const labels: PageLabelRange[] = [];
@@ -207,7 +246,7 @@ export default class MdToPdfPlugin extends Plugin {
 			mergedIndex += count;
 			state = { ...state, next: state.next + count };
 		}
-		return applyPageLabels(await mergePdfs(parts), labels);
+		return { pdf: await applyPageLabels(await mergePdfs(parts), labels), entries, tocCount, labels };
 	}
 
 	async exportFile(file: TFile) {

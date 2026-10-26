@@ -63,6 +63,13 @@ export function contentCss(s: MdToPdfSettings, styles: ParagraphStyles): string 
 }
 .md2pdf-root .md2pdf-linespace { display: block !important; margin: 0 !important; padding: 0 !important; border: 0 !important; }
 .md2pdf-root .md2pdf-columns { column-gap: 2em; column-fill: balance; }
+.md2pdf-root .md2pdf-toc { margin: 1em 0; }
+.md2pdf-root .md2pdf-toc-entry { display: flex; align-items: baseline; margin: 0.2em 0; }
+.md2pdf-root .md2pdf-toc-entry a { color: inherit; text-decoration: none; }
+.md2pdf-root .md2pdf-toc-entry::after { content: ""; order: 1; flex: 1 1 auto; min-width: 1em; border-bottom: 1px dotted #666; margin: 0 0.3em; }
+.md2pdf-root .md2pdf-toc-page { order: 2; font-variant-numeric: tabular-nums; }
+.md2pdf-root .md2pdf-toc-level-2 { padding-left: 1.5em; }
+.md2pdf-root .md2pdf-toc-level-3 { padding-left: 3em; }
 .md2pdf-root .md2pdf-columns > :first-child,
 .md2pdf-root .md2pdf-columns > :first-child > :first-child,
 .md2pdf-root .md2pdf-align:first-child > :first-child { margin-top: 0 !important; }

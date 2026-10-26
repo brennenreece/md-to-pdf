@@ -131,6 +131,10 @@ export interface MdToPdfSettings {
 	pageNumberFont: string;
 	pageNumberWeight: number;
 	pageNumberSizePt: number;
+	/** Heading levels listed in the table of contents, as "lo-hi". */
+	tocLevels: string;
+	/** Show page numbers with dot leaders in the table of contents. */
+	tocShowNumbers: boolean;
 
 	/** Snap body text and heading spacing to a vertical baseline grid. */
 	baselineGridEnabled: boolean;
@@ -246,6 +250,8 @@ export const DEFAULT_SETTINGS: MdToPdfSettings = {
 	pageNumberFont: "",
 	pageNumberWeight: 400,
 	pageNumberSizePt: 8,
+	tocLevels: "1-2",
+	tocShowNumbers: true,
 	livePreview: true,
 	livePreviewDelayMs: 1000,
 };
@@ -545,6 +551,21 @@ export class MdToPdfSettingTab extends PluginSettingTab {
 			});
 		});
 		this.pageNumberFontSettings(containerEl);
+
+		new Setting(containerEl).setName("Table of contents").setHeading();
+		const tocLevelsRow = new Setting(containerEl).setName("Heading levels").setDesc("Headings included in the table of contents placed by <toc>.");
+		tocLevelsRow.addDropdown((d) => {
+			d.addOption("1-2", "H1 to H2").addOption("1-3", "H1 to H3").addOption("1-6", "All levels");
+			d.setValue(s.tocLevels).onChange(async (v) => {
+				s.tocLevels = v;
+				await save();
+			});
+		});
+		const tocNumRow = new Setting(containerEl).setName("Show page numbers").setDesc("Dot leaders and page numbers in the table of contents.");
+		addCheckbox(tocNumRow, s.tocShowNumbers, async (v) => {
+			s.tocShowNumbers = v;
+			await save();
+		});
 
 		new Setting(containerEl).setName("PDF preview").setHeading();
 		const liveRow = new Setting(containerEl).setName("Live update").setDesc("Re-render the preview pane when the note or settings change.");

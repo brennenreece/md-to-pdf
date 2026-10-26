@@ -121,3 +121,31 @@ export async function applyPageLabels(pdf: ArrayBuffer, ranges: PageLabelRange[]
 	const bytes = await doc.save();
 	return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
+
+/** File URL of pdf.worker.mjs, which the build copies next to main.js in the plugin folder. */
+function pdfWorkerUrl(): string {
+	const path = require("path") as typeof import("path");
+	const url = require("url") as typeof import("url");
+	return url.pathToFileURL(path.join(__dirname, "pdf.worker.mjs")).href;
+}
+
+/**
+ * Finds the page each marker text appears on. Markers are invisible text placed at each heading,
+ * so the result is the heading's printed page. Returns a map from marker to 1-based page number.
+ * pdf.js is loaded on demand, so it only costs time for notes that use a table of contents.
+ */
+export async function findMarkerPages(pdf: ArrayBuffer, markers: string[]): Promise<Map<string, number>> {
+	const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+	pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl();
+	const found = new Map<string, number>();
+	const wanted = new Set(markers);
+	const doc = await pdfjs.getDocument({ data: new Uint8Array(pdf), disableFontFace: true, isEvalSupported: false } as any).promise;
+	for (let i = 1; i <= doc.numPages; i++) {
+		const content = await (await doc.getPage(i)).getTextContent();
+		const text = content.items.map((item: any) => item.str).join("|");
+		for (const m of text.match(/md2pdf-h-\d+/g) ?? []) {
+			if (wanted.has(m) && !found.has(m)) found.set(m, i);
+		}
+	}
+	return found;
+}

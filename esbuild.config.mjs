@@ -32,9 +32,15 @@ const context = await esbuild.context({
   outfile: "main.js",
 });
 
+// pdf.js needs its worker as a separate file. Copy it next to main.js so it ships with the plugin.
+import { copyFileSync } from "fs";
+const copyWorker = () => copyFileSync("node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs", "pdf.worker.mjs");
+
 if (prod) {
   await context.rebuild();
+  copyWorker();
   process.exit(0);
 } else {
+  copyWorker();
   await context.watch();
 }

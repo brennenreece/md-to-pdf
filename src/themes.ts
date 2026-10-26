@@ -98,6 +98,8 @@ export const THEME_KEYS: Array<keyof MdToPdfSettings> = [
 	"pageNumberFont",
 	"pageNumberWeight",
 	"pageNumberSizePt",
+	"tocLevels",
+	"tocShowNumbers",
 ];
 
 /** Copies the style fields and paragraph styles into a new theme object. */

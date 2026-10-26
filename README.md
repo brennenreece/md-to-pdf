@@ -68,6 +68,16 @@ Put `<align: VALUE>` on its own line to set the text alignment for the content a
 
 Columns and alignment can nest in any order. Several start tokens can share one line, such as `<columns: 2><align: left>`. For example, `<align: center>` inside a `<columns: 2>` region centers the text in one column. Each closing token closes the innermost open region of its kind. If a closing token would cross another open region, it is left as written.
 
+### Table of contents
+
+Put `<toc>` on its own line where the table of contents should go. It lists the headings in the note, from the levels set under **Table of contents** in the settings (H1–H2 by default, or H1–H3, or all levels). Each entry links to its heading, and shows its page with dot leaders when page numbers are on.
+
+Making the table of contents takes two print passes, so export is slower for notes that use `<toc>`. Notes with no `<toc>` are unchanged.
+
+If the note has no `<page-numbering>` markers of its own, the table of contents is numbered as front matter: lowercase roman up to the table of contents, then the body restarting at 1. A note with its own markers keeps exactly what those markers say.
+
+pdf.js reads the printed PDF to find heading pages, so the plugin ships `pdf.worker.mjs` next to `main.js`. Both files are needed for the plugin to work.
+
 ### Page numbering
 
 Put `<page-numbering ...>` on its own line to start a new numbering group from that point on. Each group is printed as its own section and merged into one PDF, so its numbers restart correctly.

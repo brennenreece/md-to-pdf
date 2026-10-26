@@ -43,7 +43,7 @@ export async function renderNoteToHtml(
 	markdown: string,
 	sourcePath: string,
 	owner: Component,
-	options: { nonBreakingSpaces?: boolean; smartQuotes?: boolean } = {},
+	options: { nonBreakingSpaces?: boolean; smartQuotes?: boolean; collectHeadings?: (entries: HeadingInfo[]) => void; markHeadings?: boolean } = {},
 ): Promise<string> {
 	const host = document.body.createDiv({ cls: "md2pdf-render-host markdown-rendered" });
 	host.setCssStyles({
@@ -63,6 +63,7 @@ export async function renderNoteToHtml(
 		await captureCanvases(host);
 		await inlineImages(host);
 		unwrapInternalLinks(host);
+		if (options.collectHeadings) options.collectHeadings(collectHeadings(host, options.markHeadings));
 		if (options.nonBreakingSpaces || options.smartQuotes) applyTypograf(host, options);
 		const result = host.innerHTML;
 		return result;
@@ -74,6 +75,40 @@ export async function renderNoteToHtml(
 		owner.removeChild(child);
 		host.remove();
 	}
+}
+
+/** A heading in the rendered note, with the id it was given for the table of contents. */
+export interface HeadingInfo {
+	level: number;
+	text: string;
+	id: string;
+}
+
+/**
+ * Gives every heading a stable id (`md2pdf-h-N`) and returns them in document order. The ids are
+ * the link targets for the table of contents. With `mark` set, each heading also gets an invisible
+ * text marker, which the page finder reads back from the printed PDF.
+ */
+export function collectHeadings(root: HTMLElement, mark = false): HeadingInfo[] {
+	const out: HeadingInfo[] = [];
+	root.querySelectorAll("h1, h2, h3, h4, h5, h6").forEach((h, i) => {
+		const id = `md2pdf-h-${i}`;
+		h.id = id;
+		// Read the text before the marker is added, so the TOC does not include it.
+		out.push({
+			level: Number(h.tagName.charAt(1)),
+			text: (h.textContent ?? "").replace(/\s+/g, " ").trim(),
+			id,
+		});
+		if (mark) {
+			const span = document.createElement("span");
+			span.className = "md2pdf-mark";
+			span.textContent = id;
+			span.style.cssText = "font-size:1px;color:#fff;";
+			h.appendChild(span);
+		}
+	});
+	return out;
 }
 
 /** Resolves once DOM mutations under el stop for a short quiet period. */
