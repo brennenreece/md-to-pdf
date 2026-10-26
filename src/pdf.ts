@@ -149,8 +149,9 @@ export async function findMarkerPages(
 	for (let i = 1; i <= doc.numPages; i++) {
 		const content = await (await doc.getPage(i)).getTextContent();
 		const text = content.items.map((item: any) => item.str).join("");
-		for (const m of text.match(/md2pdf-h-\d+/g) ?? []) {
-			if (wanted.has(m) && !found.has(m)) found.set(m, i);
+		for (const m of text.match(/md2pdf-h-\d+end/g) ?? []) {
+			const id = m.slice(0, -"end".length);
+			if (wanted.has(id) && !found.has(id)) found.set(id, i);
 		}
 	}
 	return found;

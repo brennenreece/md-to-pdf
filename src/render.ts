@@ -110,7 +110,8 @@ export function collectHeadings(root: HTMLElement, mark = false): HeadingInfo[] 
 		if (mark) {
 			const span = document.createElement("span");
 			span.className = "md2pdf-mark";
-			span.textContent = id;
+			// The closing "end" keeps the marker from running into the text that follows it, such as digits.
+			span.textContent = `${id}end`;
 			span.style.cssText = "font-size:1px;color:#fff;";
 			h.appendChild(span);
 		}
