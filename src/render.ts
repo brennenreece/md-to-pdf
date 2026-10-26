@@ -3,6 +3,7 @@ import { applyTypograf } from "./nbsp";
 import { COLUMNS_RULE } from "./columns";
 import { ALIGN_RULE } from "./align";
 import { wrapRegions } from "./regions";
+import { TOC_SENTINEL } from "./toc";
 
 const SETTLE_QUIET_MS = 400;
 
@@ -91,7 +92,13 @@ export interface HeadingInfo {
  */
 export function collectHeadings(root: HTMLElement, mark = false): HeadingInfo[] {
 	const out: HeadingInfo[] = [];
-	root.querySelectorAll("h1, h2, h3, h4, h5, h6").forEach((h, i) => {
+	// Only headings after the table of contents placeholder are listed. Those before it are left out.
+	const placeholder = Array.from(root.querySelectorAll("p")).find((p) => p.textContent?.trim() === TOC_SENTINEL);
+	const headings = Array.from(root.querySelectorAll("h1, h2, h3, h4, h5, h6"));
+	const afterToc = placeholder
+		? headings.filter((h) => placeholder.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING)
+		: [];
+	afterToc.forEach((h, i) => {
 		const id = `md2pdf-h-${i}`;
 		h.id = id;
 		// Read the text before the marker is added, so the TOC does not include it.
